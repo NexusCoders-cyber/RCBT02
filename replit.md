@@ -67,6 +67,19 @@ This application provides a TestDriller-style CBT experience with smooth animati
 - Sound and vibration settings
 - Data management (clear all data)
 
+### Ilom AI Assistant
+- Powered by xAI/Grok API
+- Explains difficult concepts and JAMB questions
+- Provides study tips for each subject
+- Available from dashboard and review mode only
+- **Disabled during practice/exam mode to prevent cheating**
+- Responses cached for offline access
+
+### Voice Reader
+- Text-to-speech for questions and options
+- Helps with pronunciation and comprehension
+- Uses Web Speech API
+
 ## Technical Stack
 
 - **Frontend:** React 18 with Vite
@@ -204,6 +217,8 @@ Settings are persisted locally using localStorage:
 
 ## Recent Changes
 
+- Added Ilom AI Assistant (powered by xAI/Grok) - disabled during exams to prevent cheating
+- Added Voice Reader for text-to-speech
 - Initial release with complete CBT functionality
 - JAMB-only dashboard (no WAEC/NECO)
 - Full exam mode with 60/40/40/40 question distribution

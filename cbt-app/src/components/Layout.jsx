@@ -200,7 +200,7 @@ export default function Layout() {
                 className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 text-emerald-400 hover:bg-emerald-900/50 w-full"
               >
                 <Bot className="w-5 h-5" />
-                AI Assistant
+                Ilom
               </button>
               <button
                 onClick={() => {
