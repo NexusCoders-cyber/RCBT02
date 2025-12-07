@@ -19,7 +19,7 @@ export default function AIAssistant({ isOpen, onClose, currentQuestion = null, c
     if (isOpen && messages.length === 0) {
       setMessages([{
         role: 'assistant',
-        content: `Hello! I'm your JAMB study assistant. I can help you with:
+        content: `Hello! I'm Ilom, your JAMB study assistant. I can help you with:
 
 • Explaining difficult concepts
 • Breaking down JAMB questions
@@ -122,7 +122,7 @@ How can I help you prepare for your exams today?`
   const clearChat = () => {
     setMessages([{
       role: 'assistant',
-      content: 'Chat cleared. How can I help you with your JAMB preparation?'
+      content: 'Chat cleared. I\'m Ilom - how can I help you with your JAMB preparation?'
     }])
   }
 
@@ -151,7 +151,7 @@ How can I help you prepare for your exams today?`
                 <Bot className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="font-bold text-white">AI Study Assistant</h3>
+                <h3 className="font-bold text-white">Ilom</h3>
                 <p className="text-xs text-slate-400">
                   {isOnline ? 'Online' : 'Offline - Limited features'}
                 </p>
@@ -227,7 +227,7 @@ How can I help you prepare for your exams today?`
                   {message.role === 'assistant' && (
                     <div className="flex items-center gap-2 mb-2">
                       <Sparkles className="w-4 h-4 text-emerald-400" />
-                      <span className="text-xs font-medium text-emerald-400">AI Assistant</span>
+                      <span className="text-xs font-medium text-emerald-400">Ilom</span>
                     </div>
                   )}
                   <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>

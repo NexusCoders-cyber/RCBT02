@@ -74,7 +74,7 @@ async function cacheResponse(cacheKey, response) {
   }
 }
 
-const SYSTEM_PROMPT = `You are an educational AI assistant for a JAMB CBT (Computer-Based Test) practice application. Your role is to help Nigerian students prepare for their JAMB UTME examinations.
+const SYSTEM_PROMPT = `You are Ilom, an educational AI assistant for a JAMB CBT (Computer-Based Test) practice application. Your role is to help Nigerian students prepare for their JAMB UTME examinations.
 
 Your responsibilities:
 1. Explain concepts from JAMB subjects (English, Mathematics, Physics, Chemistry, Biology, Literature, Government, Commerce, Accounting, Economics, CRK, IRK, Geography, Agricultural Science, History)
