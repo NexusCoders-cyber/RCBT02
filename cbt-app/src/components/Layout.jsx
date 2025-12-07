@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, BookOpen, Settings, Menu, X, HelpCircle, Bell, GraduationCap, Book, Wifi, WifiOff } from 'lucide-react'
+import { Home, BookOpen, Settings, Menu, X, Bell, GraduationCap, Book, WifiOff, Bot } from 'lucide-react'
 import useStore from '../store/useStore'
 import Notifications from './Notifications'
 import Dictionary from './Dictionary'
+import AIAssistant from './AIAssistant'
 
 export default function Layout() {
   const location = useLocation()
@@ -12,6 +13,7 @@ export default function Layout() {
   const [showSidebar, setShowSidebar] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showDictionary, setShowDictionary] = useState(false)
+  const [showAI, setShowAI] = useState(false)
 
   const unreadCount = notifications.filter(n => !n.read).length
 
@@ -116,14 +118,18 @@ export default function Layout() {
                 </div>
               )}
               <button 
+                onClick={() => setShowAI(true)}
+                className="p-2 rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 text-white hover:from-emerald-500 hover:to-teal-500 transition-all shadow-lg shadow-emerald-500/20"
+                title="AI Study Assistant"
+              >
+                <Bot className="w-5 h-5" />
+              </button>
+              <button 
                 onClick={() => setShowDictionary(true)}
                 className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors relative"
                 title="Dictionary"
               >
                 <Book className="w-5 h-5" />
-              </button>
-              <button className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors relative">
-                <HelpCircle className="w-5 h-5" />
               </button>
               <button 
                 onClick={() => setShowNotifications(true)}
@@ -189,6 +195,16 @@ export default function Layout() {
               <button
                 onClick={() => {
                   setShowSidebar(false)
+                  setShowAI(true)
+                }}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 text-emerald-400 hover:bg-emerald-900/50 w-full"
+              >
+                <Bot className="w-5 h-5" />
+                AI Assistant
+              </button>
+              <button
+                onClick={() => {
+                  setShowSidebar(false)
                   setShowDictionary(true)
                 }}
                 className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 text-slate-400 hover:text-white hover:bg-slate-800 w-full"
@@ -230,11 +246,19 @@ export default function Layout() {
               </Link>
             )
           })}
+          <button
+            onClick={() => setShowAI(true)}
+            className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 text-emerald-400"
+          >
+            <Bot className="w-5 h-5" />
+            <span className="text-xs font-medium">AI</span>
+          </button>
         </div>
       </nav>
 
       <Notifications isOpen={showNotifications} onClose={() => setShowNotifications(false)} />
       <Dictionary isOpen={showDictionary} onClose={() => setShowDictionary(false)} />
+      <AIAssistant isOpen={showAI} onClose={() => setShowAI(false)} />
     </div>
   )
 }

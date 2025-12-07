@@ -3,9 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, Check, X, 
-  Eye, Grid, Home 
+  Eye, Grid, Home, Bot, Lightbulb 
 } from 'lucide-react'
 import useStore from '../store/useStore'
+import AIAssistant from '../components/AIAssistant'
+import { VoiceReaderCompact } from '../components/VoiceReader'
+import { explainQuestion } from '../services/aiService'
 
 export default function Review() {
   const navigate = useNavigate()
@@ -21,6 +24,9 @@ export default function Review() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showNavGrid, setShowNavGrid] = useState(false)
   const [filter, setFilter] = useState('all')
+  const [showAI, setShowAI] = useState(false)
+  const [explanation, setExplanation] = useState('')
+  const [loadingExplanation, setLoadingExplanation] = useState(false)
 
   useEffect(() => {
     if (!isExamSubmitted || questions.length === 0) {
@@ -154,25 +160,37 @@ export default function Review() {
                     ? 'border-green-500' 
                     : 'border-red-500'
               }`}>
-                <div className="flex items-center gap-2 mb-4">
-                  {isUnanswered ? (
-                    <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium">
-                      Not Answered
-                    </span>
-                  ) : isCorrect ? (
-                    <span className="px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 text-sm font-medium flex items-center gap-1">
-                      <Check className="w-4 h-4" /> Correct
-                    </span>
-                  ) : (
-                    <span className="px-3 py-1 rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 text-sm font-medium flex items-center gap-1">
-                      <X className="w-4 h-4" /> Wrong
-                    </span>
-                  )}
-                  {currentQuestion.examyear && (
-                    <span className="text-sm text-slate-500 dark:text-slate-400">
-                      JAMB {currentQuestion.examyear}
-                    </span>
-                  )}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    {isUnanswered ? (
+                      <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium">
+                        Not Answered
+                      </span>
+                    ) : isCorrect ? (
+                      <span className="px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 text-sm font-medium flex items-center gap-1">
+                        <Check className="w-4 h-4" /> Correct
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 text-sm font-medium flex items-center gap-1">
+                        <X className="w-4 h-4" /> Wrong
+                      </span>
+                    )}
+                    {currentQuestion.examyear && (
+                      <span className="text-sm text-slate-500 dark:text-slate-400">
+                        JAMB {currentQuestion.examyear}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <VoiceReaderCompact question={currentQuestion} />
+                    <button
+                      onClick={() => setShowAI(true)}
+                      className="p-2 rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 text-white hover:from-emerald-500 hover:to-teal-500 transition-all"
+                      title="AI Assistant"
+                    >
+                      <Bot className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div 
@@ -344,6 +362,13 @@ export default function Review() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AIAssistant 
+        isOpen={showAI} 
+        onClose={() => setShowAI(false)} 
+        currentQuestion={currentQuestion}
+        currentSubject={selectedSubjects[0]}
+      />
     </div>
   )
 }

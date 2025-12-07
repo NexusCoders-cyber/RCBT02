@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Clock, ChevronLeft, ChevronRight, Flag, Send, 
-  AlertTriangle, Grid, X, Check, Bookmark, Calculator as CalcIcon 
+  AlertTriangle, Grid, X, Check, Bookmark, Calculator as CalcIcon, Bot, Volume2 
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import Calculator from '../components/Calculator'
+import AIAssistant from '../components/AIAssistant'
+import { VoiceReaderCompact } from '../components/VoiceReader'
 
 export default function Exam() {
   const navigate = useNavigate()
@@ -38,6 +40,7 @@ export default function Exam() {
   const [showNavGrid, setShowNavGrid] = useState(false)
   const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [showTimeWarning, setShowTimeWarning] = useState(false)
+  const [showAI, setShowAI] = useState(false)
   const hasSubmittedRef = useRef(false)
 
   useEffect(() => {
@@ -218,6 +221,14 @@ export default function Exam() {
               )}
               
               <button
+                onClick={() => setShowAI(true)}
+                className="p-2 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white hover:from-emerald-500 hover:to-teal-500 transition-all"
+                title="AI Assistant"
+              >
+                <Bot className="w-5 h-5" />
+              </button>
+              
+              <button
                 onClick={() => setShowNavGrid(true)}
                 className="p-2 rounded-xl bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
               >
@@ -261,6 +272,7 @@ export default function Exam() {
                 Question {currentQuestionIndex + 1} of {questions.length}
               </span>
               <div className="flex items-center gap-2">
+                <VoiceReaderCompact question={currentQuestion} />
                 <button
                   onClick={handleBookmark}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors
@@ -540,6 +552,13 @@ export default function Exam() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AIAssistant 
+        isOpen={showAI} 
+        onClose={() => setShowAI(false)} 
+        currentQuestion={currentQuestion}
+        currentSubject={currentSubject}
+      />
     </div>
   )
 }
