@@ -28,30 +28,80 @@ apiClient.interceptors.response.use(
 )
 
 const DB_NAME = 'jamb-cbt-offline'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const QUESTIONS_STORE = 'questions'
 
 let db = null
+let dbInitPromise = null
+
+async function deleteDatabase() {
+  return new Promise((resolve) => {
+    db = null
+    dbInitPromise = null
+    const deleteRequest = indexedDB.deleteDatabase(DB_NAME)
+    deleteRequest.onsuccess = () => resolve(true)
+    deleteRequest.onerror = () => resolve(false)
+    deleteRequest.onblocked = () => resolve(false)
+  })
+}
 
 async function openDB() {
-  if (db) return db
+  if (db && db.objectStoreNames.contains(QUESTIONS_STORE)) {
+    return db
+  }
   
-  return new Promise((resolve, reject) => {
+  if (dbInitPromise) {
+    return dbInitPromise
+  }
+  
+  dbInitPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
     
-    request.onerror = () => reject(request.error)
+    request.onerror = async () => {
+      dbInitPromise = null
+      await deleteDatabase()
+      const retryRequest = indexedDB.open(DB_NAME, DB_VERSION)
+      retryRequest.onerror = () => reject(retryRequest.error)
+      retryRequest.onsuccess = () => {
+        db = retryRequest.result
+        resolve(db)
+      }
+      retryRequest.onupgradeneeded = (event) => {
+        const database = event.target.result
+        if (!database.objectStoreNames.contains(QUESTIONS_STORE)) {
+          database.createObjectStore(QUESTIONS_STORE, { keyPath: 'cacheKey' })
+        }
+      }
+    }
+    
     request.onsuccess = () => {
       db = request.result
+      if (!db.objectStoreNames.contains(QUESTIONS_STORE)) {
+        db.close()
+        db = null
+        deleteDatabase().then(() => {
+          dbInitPromise = null
+          openDB().then(resolve).catch(reject)
+        })
+        return
+      }
       resolve(db)
     }
     
     request.onupgradeneeded = (event) => {
       const database = event.target.result
+      Array.from(database.objectStoreNames).forEach((storeName) => {
+        if (storeName !== QUESTIONS_STORE) {
+          database.deleteObjectStore(storeName)
+        }
+      })
       if (!database.objectStoreNames.contains(QUESTIONS_STORE)) {
         database.createObjectStore(QUESTIONS_STORE, { keyPath: 'cacheKey' })
       }
     }
   })
+  
+  return dbInitPromise
 }
 
 async function getCachedQuestions(cacheKey) {
