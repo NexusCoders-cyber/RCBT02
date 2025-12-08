@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
   Rocket, BookOpen, TrendingUp, 
-  Trophy, GraduationCap, Bookmark, ChevronRight, Sparkles, Book
+  Trophy, GraduationCap, Bookmark, ChevronRight, Sparkles, Book,
+  User, Flame, Star, WifiOff, Wifi, Download
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import Dictionary from '../components/Dictionary'
@@ -23,13 +24,18 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 }
 
-const FeatureCard = ({ to, icon: Icon, title, description, bgColor, textColor, iconBg }) => (
+const FeatureCard = ({ to, icon: Icon, title, description, bgColor, textColor, iconBg, badge }) => (
   <Link to={to} className="block group">
     <motion.div
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className={`${bgColor} rounded-2xl p-5 h-full transition-all duration-300 group-hover:shadow-lg`}
+      className={`${bgColor} rounded-2xl p-5 h-full transition-all duration-300 group-hover:shadow-lg relative overflow-hidden`}
     >
+      {badge && (
+        <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-yellow-500 text-yellow-900 text-xs font-bold">
+          {badge}
+        </span>
+      )}
       <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center mb-3`}>
         <Icon className={`w-6 h-6 ${textColor}`} />
       </div>
@@ -40,19 +46,59 @@ const FeatureCard = ({ to, icon: Icon, title, description, bgColor, textColor, i
 )
 
 export default function Dashboard() {
-  const { practiceHistory, examHistory, bookmarkedQuestions } = useStore()
+  const { 
+    practiceHistory, 
+    examHistory, 
+    studyHistory,
+    bookmarkedQuestions, 
+    userProfile, 
+    isOnline,
+  } = useStore()
   const [showDictionary, setShowDictionary] = useState(false)
+  const [cachedCount, setCachedCount] = useState(0)
 
-  const recentExams = [...practiceHistory, ...examHistory]
+  useEffect(() => {
+    const checkCachedQuestions = async () => {
+      try {
+        const request = indexedDB.open('jamb-cbt-offline', 1)
+        request.onsuccess = (event) => {
+          const db = event.target.result
+          if (db.objectStoreNames.contains('questions')) {
+            const transaction = db.transaction('questions', 'readonly')
+            const store = transaction.objectStore('questions')
+            const countRequest = store.count()
+            countRequest.onsuccess = () => {
+              setCachedCount(countRequest.result * 40)
+            }
+          }
+        }
+      } catch {
+        setCachedCount(0)
+      }
+    }
+    checkCachedQuestions()
+  }, [])
+
+  const recentExams = [...practiceHistory, ...examHistory, ...studyHistory]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 3)
 
-  const totalPractice = practiceHistory.length
-  const totalExams = examHistory.length
+  const totalSessions = practiceHistory.length + examHistory.length + studyHistory.length
   const totalQuestionsPracticed = recentExams.reduce((sum, e) => sum + e.totalQuestions, 0)
   const averageScore = recentExams.length > 0
     ? Math.round(recentExams.reduce((sum, e) => sum + e.overallScore, 0) / recentExams.length)
     : 0
+
+  const getModeInfo = (mode) => {
+    switch (mode) {
+      case 'full':
+        return { icon: Trophy, color: 'text-emerald-400', bg: 'bg-emerald-900/50', label: 'Full Exam' }
+      case 'study':
+        return { icon: Star, color: 'text-violet-400', bg: 'bg-violet-900/50', label: 'Study' }
+      default:
+        return { icon: BookOpen, color: 'text-blue-400', bg: 'bg-blue-900/50', label: 'Practice' }
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -65,12 +111,50 @@ export default function Dashboard() {
         >
           <motion.div variants={itemVariants} className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-rose-500 via-pink-500 to-purple-500 p-6">
             <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-5 h-5 text-yellow-300" />
-                <span className="text-white/90 text-sm font-medium">SCORE: {averageScore > 0 ? `${averageScore}%` : 'Start practicing!'}</span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-yellow-300" />
+                  <span className="text-white/90 text-sm font-medium">
+                    {averageScore > 0 ? `SCORE: ${averageScore}%` : 'Start practicing!'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isOnline ? (
+                    <div className="flex items-center gap-1 text-green-300 text-xs">
+                      <Wifi className="w-4 h-4" />
+                      <span>Online</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-yellow-300 text-xs">
+                      <WifiOff className="w-4 h-4" />
+                      <span>Offline</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-1">Welcome to JAMB CBT</h2>
-              <p className="text-white/80 text-sm">Master your UTME preparation</p>
+              <div className="flex items-center gap-4">
+                <Link to="/profile" className="flex-shrink-0">
+                  <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center overflow-hidden border-2 border-white/30 hover:border-white transition-colors">
+                    {userProfile.avatar ? (
+                      <img src={userProfile.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-7 h-7 text-white" />
+                    )}
+                  </div>
+                </Link>
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-1">
+                    Hi, {userProfile.name || 'Student'}!
+                  </h2>
+                  <p className="text-white/80 text-sm">Master your UTME preparation</p>
+                </div>
+              </div>
+              {userProfile.streakDays > 0 && (
+                <div className="mt-3 flex items-center gap-2 text-orange-300">
+                  <Flame className="w-4 h-4" />
+                  <span className="text-sm font-medium">{userProfile.streakDays} day streak!</span>
+                </div>
+              )}
             </div>
             <div className="absolute -right-4 -bottom-4 opacity-20">
               <GraduationCap className="w-32 h-32 text-white" />
@@ -79,78 +163,110 @@ export default function Dashboard() {
 
           <motion.div variants={itemVariants} className="grid grid-cols-2 gap-4">
             <FeatureCard
+              to="/study-setup"
+              icon={Star}
+              title="Study Mode"
+              description="Learn at your pace, no timer"
+              bgColor="bg-violet-100 dark:bg-violet-900/30"
+              textColor="text-violet-700 dark:text-violet-400"
+              iconBg="bg-violet-200 dark:bg-violet-800/50"
+              badge="NEW"
+            />
+            <FeatureCard
               to="/practice"
               icon={Rocket}
-              title="Practice For UTME"
-              description={`With ${totalQuestionsPracticed > 0 ? totalQuestionsPracticed.toLocaleString() + '+' : '33,550'} questions offline`}
+              title="Practice"
+              description={cachedCount > 0 ? `${cachedCount.toLocaleString()}+ offline` : 'Quick practice'}
               bgColor="bg-green-100 dark:bg-green-900/30"
               textColor="text-green-700 dark:text-green-400"
               iconBg="bg-green-200 dark:bg-green-800/50"
             />
+          </motion.div>
+
+          <motion.div variants={itemVariants} className="grid grid-cols-2 gap-4">
             <FeatureCard
               to="/exam-setup"
               icon={BookOpen}
-              title="Full Exam Mode"
-              description="JAMB style exam simulation"
+              title="Full Exam"
+              description="JAMB simulation"
               bgColor="bg-pink-100 dark:bg-pink-900/30"
               textColor="text-pink-700 dark:text-pink-400"
               iconBg="bg-pink-200 dark:bg-pink-800/50"
             />
-          </motion.div>
-
-          <motion.div variants={itemVariants} className="grid grid-cols-2 gap-4">
             <FeatureCard
               to="/analytics"
               icon={TrendingUp}
-              title="Analytics & History"
-              description="Track your progress and results"
+              title="Analytics"
+              description="Track your progress"
               bgColor="bg-cyan-100 dark:bg-cyan-900/30"
               textColor="text-cyan-700 dark:text-cyan-400"
               iconBg="bg-cyan-200 dark:bg-cyan-800/50"
             />
-            <FeatureCard
-              to="/settings"
-              icon={GraduationCap}
-              title="Settings"
-              description="Customize your experience"
-              bgColor="bg-amber-100 dark:bg-amber-900/30"
-              textColor="text-amber-700 dark:text-amber-400"
-              iconBg="bg-amber-200 dark:bg-amber-800/50"
-            />
           </motion.div>
 
-          <motion.div variants={itemVariants} className="grid grid-cols-2 gap-4">
+          <motion.div variants={itemVariants} className="grid grid-cols-3 gap-3">
             <Link to="/bookmarks" className="block group">
-              <div className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl p-5 h-full transition-all duration-300 group-hover:shadow-lg border border-amber-200 dark:border-amber-800/30">
-                <div className="flex flex-col items-center text-center gap-3">
-                  <div className="w-14 h-14 bg-amber-100 dark:bg-amber-800/50 rounded-xl flex items-center justify-center">
-                    <Bookmark className="w-7 h-7 text-amber-600 dark:text-amber-400" />
+              <div className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl p-4 h-full transition-all duration-300 group-hover:shadow-lg border border-amber-200 dark:border-amber-800/30">
+                <div className="flex flex-col items-center text-center gap-2">
+                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-800/50 rounded-xl flex items-center justify-center">
+                    <Bookmark className="w-6 h-6 text-amber-600 dark:text-amber-400" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-amber-700 dark:text-amber-400 text-lg">Bookmarks</h3>
-                    <p className="text-slate-600 dark:text-slate-300 text-sm">
-                      {bookmarkedQuestions.length > 0 
-                        ? `${bookmarkedQuestions.length} saved` 
-                        : 'Saved questions'}
+                    <h3 className="font-bold text-amber-700 dark:text-amber-400 text-sm">Bookmarks</h3>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs">
+                      {bookmarkedQuestions.length > 0 ? `${bookmarkedQuestions.length} saved` : 'Save questions'}
                     </p>
                   </div>
                 </div>
               </div>
             </Link>
             <button onClick={() => setShowDictionary(true)} className="block group text-left">
-              <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-5 h-full transition-all duration-300 group-hover:shadow-lg border border-indigo-200 dark:border-indigo-800/30">
-                <div className="flex flex-col items-center text-center gap-3">
-                  <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-800/50 rounded-xl flex items-center justify-center">
-                    <Book className="w-7 h-7 text-indigo-600 dark:text-indigo-400" />
+              <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-4 h-full transition-all duration-300 group-hover:shadow-lg border border-indigo-200 dark:border-indigo-800/30">
+                <div className="flex flex-col items-center text-center gap-2">
+                  <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-800/50 rounded-xl flex items-center justify-center">
+                    <Book className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-indigo-700 dark:text-indigo-400 text-lg">Dictionary</h3>
-                    <p className="text-slate-600 dark:text-slate-300 text-sm">Search word meanings</p>
+                    <h3 className="font-bold text-indigo-700 dark:text-indigo-400 text-sm">Dictionary</h3>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs">Look up words</p>
                   </div>
                 </div>
               </div>
             </button>
+            <Link to="/profile" className="block group">
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl p-4 h-full transition-all duration-300 group-hover:shadow-lg border border-emerald-200 dark:border-emerald-800/30">
+                <div className="flex flex-col items-center text-center gap-2">
+                  <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-800/50 rounded-xl flex items-center justify-center overflow-hidden">
+                    {userProfile.avatar ? (
+                      <img src={userProfile.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">Profile</h3>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs">{totalSessions} sessions</p>
+                  </div>
+                </div>
+              </div>
+            </Link>
           </motion.div>
+
+          {!isOnline && cachedCount > 0 && (
+            <motion.div variants={itemVariants} className="bg-amber-900/30 rounded-2xl p-4 border border-amber-800/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-800/50 flex items-center justify-center">
+                  <Download className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-amber-300">Offline Mode Active</p>
+                  <p className="text-sm text-amber-400">
+                    {cachedCount.toLocaleString()} questions available offline
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
 
           {recentExams.length > 0 && (
             <motion.div variants={itemVariants}>
@@ -162,55 +278,52 @@ export default function Dashboard() {
                 </Link>
               </div>
               <div className="space-y-3">
-                {recentExams.map((exam) => (
-                  <motion.div 
-                    key={exam.id} 
-                    whileHover={{ scale: 1.01 }}
-                    className="bg-slate-800 rounded-xl p-4 border border-slate-700"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center
-                          ${exam.mode === 'full' 
-                            ? 'bg-emerald-900/50' 
-                            : 'bg-blue-900/50'
-                          }`}>
-                          {exam.mode === 'full' 
-                            ? <Trophy className="w-6 h-6 text-emerald-400" />
-                            : <BookOpen className="w-6 h-6 text-blue-400" />
-                          }
+                {recentExams.map((exam) => {
+                  const modeInfo = getModeInfo(exam.mode)
+                  const ModeIcon = modeInfo.icon
+                  return (
+                    <motion.div 
+                      key={exam.id} 
+                      whileHover={{ scale: 1.01 }}
+                      className="bg-slate-800 rounded-xl p-4 border border-slate-700"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${modeInfo.bg}`}>
+                            <ModeIcon className={`w-6 h-6 ${modeInfo.color}`} />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-white">
+                              {exam.mode === 'full' ? 'Full Exam' : exam.subjects?.[0] || modeInfo.label}
+                            </p>
+                            <p className="text-sm text-slate-400">
+                              {new Date(exam.date).toLocaleDateString()} • {Math.round(exam.duration / 60)} mins
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold text-white">
-                            {exam.mode === 'full' ? 'Full Exam' : exam.subjects[0]}
+                        <div className="text-right">
+                          <p className={`text-2xl font-bold ${
+                            exam.overallScore >= 70 ? 'text-emerald-400' :
+                            exam.overallScore >= 50 ? 'text-amber-400' :
+                            'text-red-400'
+                          }`}>
+                            {exam.overallScore}%
                           </p>
                           <p className="text-sm text-slate-400">
-                            {new Date(exam.date).toLocaleDateString()} • {Math.round(exam.duration / 60)} mins
+                            {exam.totalCorrect}/{exam.totalQuestions}
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className={`text-2xl font-bold ${
-                          exam.overallScore >= 70 ? 'text-emerald-400' :
-                          exam.overallScore >= 50 ? 'text-amber-400' :
-                          'text-red-400'
-                        }`}>
-                          {exam.overallScore}%
-                        </p>
-                        <p className="text-sm text-slate-400">
-                          {exam.totalCorrect}/{exam.totalQuestions}
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  )
+                })}
               </div>
             </motion.div>
           )}
 
           <motion.div variants={itemVariants} className="pt-4">
             <p className="text-center text-slate-500 text-sm">
-              Powered by ALOC API
+              Powered by ALOC API • Works Offline
             </p>
           </motion.div>
         </motion.div>

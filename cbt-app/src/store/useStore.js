@@ -21,6 +21,22 @@ const JAMB_SUBJECTS = [
 
 const YEARS = Array.from({ length: 48 }, (_, i) => 2025 - i)
 
+const DEFAULT_PROFILE = {
+  id: null,
+  name: '',
+  email: '',
+  avatar: null,
+  avatarType: null,
+  createdAt: null,
+  lastLogin: null,
+  streakDays: 0,
+  lastPracticeDate: null,
+  totalQuestionsAnswered: 0,
+  totalCorrectAnswers: 0,
+  achievements: [],
+  preferredSubjects: [],
+}
+
 const useStore = create(
   persist(
     (set, get) => ({
@@ -33,6 +49,9 @@ const useStore = create(
       
       subjects: JAMB_SUBJECTS,
       years: YEARS,
+      
+      userProfile: { ...DEFAULT_PROFILE },
+      isLoggedIn: false,
       
       currentExam: null,
       examMode: null,
@@ -50,10 +69,23 @@ const useStore = create(
       isExamSubmitted: false,
       showCalculator: false,
       
+      studyMode: {
+        isActive: false,
+        selectedSubjects: [],
+        selectedYears: [],
+        showAnswer: false,
+        currentAnswerRevealed: false,
+        questionsPerSubject: 20,
+      },
+      
       practiceHistory: [],
       examHistory: [],
+      studyHistory: [],
       notifications: [],
       isOnline: true,
+      
+      showResultsModal: false,
+      pendingResult: null,
       
       setTheme: (theme) => set({ theme }),
       setFontSize: (fontSize) => set({ fontSize }),
@@ -63,6 +95,88 @@ const useStore = create(
       setCalculatorEnabled: (calculatorEnabled) => set({ calculatorEnabled }),
       toggleCalculator: () => set((state) => ({ showCalculator: !state.showCalculator })),
       setShowCalculator: (show) => set({ showCalculator: show }),
+      
+      setUserProfile: (profile) => {
+        const updatedProfile = {
+          ...get().userProfile,
+          ...profile,
+          lastLogin: Date.now(),
+        }
+        set({ 
+          userProfile: updatedProfile,
+          isLoggedIn: true,
+        })
+      },
+      
+      updateProfileAvatar: async (file) => {
+        return new Promise((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            const avatarData = reader.result
+            set((state) => ({
+              userProfile: {
+                ...state.userProfile,
+                avatar: avatarData,
+                avatarType: file.type,
+              },
+            }))
+            resolve(avatarData)
+          }
+          reader.readAsDataURL(file)
+        })
+      },
+      
+      updateProfileStats: (correct, total) => {
+        set((state) => {
+          const today = new Date().toDateString()
+          const lastPractice = state.userProfile.lastPracticeDate
+          let newStreak = state.userProfile.streakDays
+          
+          if (lastPractice) {
+            const lastDate = new Date(lastPractice).toDateString()
+            const yesterday = new Date(Date.now() - 86400000).toDateString()
+            
+            if (lastDate === yesterday) {
+              newStreak += 1
+            } else if (lastDate !== today) {
+              newStreak = 1
+            }
+          } else {
+            newStreak = 1
+          }
+          
+          return {
+            userProfile: {
+              ...state.userProfile,
+              totalQuestionsAnswered: state.userProfile.totalQuestionsAnswered + total,
+              totalCorrectAnswers: state.userProfile.totalCorrectAnswers + correct,
+              streakDays: newStreak,
+              lastPracticeDate: today,
+            },
+          }
+        })
+      },
+      
+      logout: () => {
+        set({
+          userProfile: { ...DEFAULT_PROFILE },
+          isLoggedIn: false,
+        })
+      },
+      
+      createGuestProfile: (name) => {
+        const profile = {
+          ...DEFAULT_PROFILE,
+          id: `guest_${Date.now()}`,
+          name: name || 'Student',
+          createdAt: Date.now(),
+          lastLogin: Date.now(),
+        }
+        set({
+          userProfile: profile,
+          isLoggedIn: true,
+        })
+      },
       
       bookmarkQuestion: (question) => {
         set((state) => {
@@ -89,6 +203,75 @@ const useStore = create(
       
       isBookmarked: (questionId) => {
         return get().bookmarkedQuestions.some(q => q.id === questionId)
+      },
+      
+      initStudyMode: (subjects, years, questionsPerSubject = 20) => {
+        set({
+          studyMode: {
+            isActive: false,
+            selectedSubjects: subjects,
+            selectedYears: years,
+            showAnswer: true,
+            currentAnswerRevealed: false,
+            questionsPerSubject,
+          },
+        })
+      },
+      
+      startStudyMode: (subjects, questions) => {
+        const allQuestions = []
+        let globalIndex = 0
+        
+        subjects.forEach((subject, subjectIdx) => {
+          const subjectQuestions = questions[subject.id] || []
+          subjectQuestions.forEach((q, qIdx) => {
+            allQuestions.push({
+              ...q,
+              id: q.id || `${subject.id}-study-${qIdx}`,
+              globalIndex: globalIndex++,
+              subjectId: subject.id,
+              subjectIndex: subjectIdx,
+            })
+          })
+        })
+        
+        set({
+          examMode: 'study',
+          selectedSubjects: subjects,
+          questions: allQuestions,
+          currentQuestionIndex: 0,
+          currentSubjectIndex: 0,
+          answers: {},
+          markedForReview: [],
+          timeRemaining: 0,
+          examStartTime: Date.now(),
+          isExamActive: true,
+          isExamSubmitted: false,
+          showCalculator: false,
+          studyMode: {
+            ...get().studyMode,
+            isActive: true,
+            currentAnswerRevealed: false,
+          },
+        })
+      },
+      
+      revealAnswer: () => {
+        set((state) => ({
+          studyMode: {
+            ...state.studyMode,
+            currentAnswerRevealed: true,
+          },
+        }))
+      },
+      
+      hideAnswer: () => {
+        set((state) => ({
+          studyMode: {
+            ...state.studyMode,
+            currentAnswerRevealed: false,
+          },
+        }))
       },
       
       startPracticeMode: (subject, year, questions, duration) => {
@@ -153,6 +336,10 @@ const useStore = create(
           set({
             currentQuestionIndex: index,
             currentSubjectIndex: question.subjectIndex || 0,
+            studyMode: {
+              ...get().studyMode,
+              currentAnswerRevealed: false,
+            },
           })
         }
       },
@@ -169,6 +356,10 @@ const useStore = create(
             set({
               currentSubjectIndex: subjectIndex,
               currentQuestionIndex: firstQuestionOfSubject,
+              studyMode: {
+                ...get().studyMode,
+                currentAnswerRevealed: false,
+              },
             })
           }
         }
@@ -204,8 +395,15 @@ const useStore = create(
           subjectIds: state.selectedSubjects.map(s => s.id),
           date: new Date().toISOString(),
           duration: Math.floor((Date.now() - state.examStartTime) / 1000),
+          questions: state.questions,
+          answers: state.answers,
           ...result,
         }
+        
+        get().updateProfileStats(result.totalCorrect, result.totalQuestions)
+        
+        const historyKey = state.examMode === 'study' ? 'studyHistory' : 
+                          state.examMode === 'practice' ? 'practiceHistory' : 'examHistory'
         
         set((state) => ({
           isExamActive: false,
@@ -213,13 +411,27 @@ const useStore = create(
           examEndTime: Date.now(),
           currentExam: examRecord,
           showCalculator: false,
-          [state.examMode === 'practice' ? 'practiceHistory' : 'examHistory']: [
+          showResultsModal: true,
+          pendingResult: examRecord,
+          studyMode: {
+            ...state.studyMode,
+            isActive: false,
+            currentAnswerRevealed: false,
+          },
+          [historyKey]: [
             examRecord,
-            ...(state.examMode === 'practice' ? state.practiceHistory : state.examHistory).slice(0, 49),
+            ...(state[historyKey] || []).slice(0, 49),
           ],
         }))
         
         return examRecord
+      },
+      
+      closeResultsModal: () => {
+        set({
+          showResultsModal: false,
+          pendingResult: null,
+        })
       },
       
       resetExam: () => {
@@ -238,6 +450,16 @@ const useStore = create(
           isExamActive: false,
           isExamSubmitted: false,
           showCalculator: false,
+          showResultsModal: false,
+          pendingResult: null,
+          studyMode: {
+            isActive: false,
+            selectedSubjects: [],
+            selectedYears: [],
+            showAnswer: true,
+            currentAnswerRevealed: false,
+            questionsPerSubject: 20,
+          },
         })
       },
       
@@ -245,6 +467,7 @@ const useStore = create(
         set({
           practiceHistory: [],
           examHistory: [],
+          studyHistory: [],
           bookmarkedQuestions: [],
           notifications: [],
           currentExam: null,
@@ -261,6 +484,16 @@ const useStore = create(
           isExamActive: false,
           isExamSubmitted: false,
           showCalculator: false,
+          showResultsModal: false,
+          pendingResult: null,
+          studyMode: {
+            isActive: false,
+            selectedSubjects: [],
+            selectedYears: [],
+            showAnswer: true,
+            currentAnswerRevealed: false,
+            questionsPerSubject: 20,
+          },
         })
       },
       
@@ -307,8 +540,11 @@ const useStore = create(
         calculatorEnabled: state.calculatorEnabled,
         practiceHistory: state.practiceHistory,
         examHistory: state.examHistory,
+        studyHistory: state.studyHistory,
         bookmarkedQuestions: state.bookmarkedQuestions,
         notifications: state.notifications,
+        userProfile: state.userProfile,
+        isLoggedIn: state.isLoggedIn,
       }),
     }
   )
@@ -322,10 +558,12 @@ function calculateResult(state) {
   let totalUnanswered = 0
   
   const subjectResults = {}
+  const questionDetails = []
   
   selectedSubjects.forEach((subject) => {
     subjectResults[subject.id] = {
       name: subject.name,
+      icon: subject.icon,
       total: 0,
       correct: 0,
       wrong: 0,
@@ -340,16 +578,26 @@ function calculateResult(state) {
     
     subjectResults[subjectId].total++
     
+    let status = 'unanswered'
     if (userAnswer === undefined || userAnswer === null) {
       totalUnanswered++
       subjectResults[subjectId].unanswered++
     } else if (userAnswer === question.answer) {
       totalCorrect++
       subjectResults[subjectId].correct++
+      status = 'correct'
     } else {
       totalWrong++
       subjectResults[subjectId].wrong++
+      status = 'wrong'
     }
+    
+    questionDetails.push({
+      ...question,
+      userAnswer,
+      status,
+      index,
+    })
   })
   
   Object.keys(subjectResults).forEach((subjectId) => {
@@ -367,6 +615,7 @@ function calculateResult(state) {
     totalUnanswered,
     overallScore,
     subjectResults,
+    questionDetails,
   }
 }
 

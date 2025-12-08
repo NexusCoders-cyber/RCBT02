@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
   ArrowLeft, TrendingUp, Award, Target, Clock,
-  BarChart2, Calendar, BookOpen
+  BarChart2, Calendar, BookOpen, Star, Trophy
 } from 'lucide-react'
 import { 
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -11,15 +11,15 @@ import {
 } from 'recharts'
 import useStore from '../store/useStore'
 
-const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+const COLORS = ['#3b82f6', '#22c55e', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16']
 
 export default function Analytics() {
-  const { practiceHistory, examHistory, subjects } = useStore()
+  const { practiceHistory, examHistory, studyHistory } = useStore()
 
   const allHistory = useMemo(() => {
-    return [...practiceHistory, ...examHistory]
+    return [...practiceHistory, ...examHistory, ...studyHistory]
       .sort((a, b) => new Date(a.date) - new Date(b.date))
-  }, [practiceHistory, examHistory])
+  }, [practiceHistory, examHistory, studyHistory])
 
   const stats = useMemo(() => {
     if (allHistory.length === 0) {
@@ -68,7 +68,7 @@ export default function Analytics() {
       if (h.subjectResults) {
         Object.entries(h.subjectResults).forEach(([id, data]) => {
           if (!subjectScores[id]) {
-            subjectScores[id] = { name: data.name, scores: [], total: 0, correct: 0 }
+            subjectScores[id] = { name: data.name, icon: data.icon, scores: [], total: 0, correct: 0 }
           }
           subjectScores[id].scores.push(data.score)
           subjectScores[id].total += data.total
@@ -82,6 +82,7 @@ export default function Analytics() {
         id,
         name: data.name.length > 12 ? data.name.substring(0, 12) + '...' : data.name,
         fullName: data.name,
+        icon: data.icon,
         averageScore: Math.round(data.scores.reduce((a, b) => a + b, 0) / data.scores.length),
         attempts: data.scores.length,
         accuracy: data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0,
@@ -91,10 +92,22 @@ export default function Analytics() {
 
   const modeDistribution = useMemo(() => {
     return [
-      { name: 'Practice', value: practiceHistory.length },
-      { name: 'Full Exam', value: examHistory.length },
+      { name: 'Practice', value: practiceHistory.length, color: '#3b82f6' },
+      { name: 'Full Exam', value: examHistory.length, color: '#22c55e' },
+      { name: 'Study', value: studyHistory.length, color: '#8b5cf6' },
     ].filter(d => d.value > 0)
-  }, [practiceHistory, examHistory])
+  }, [practiceHistory, examHistory, studyHistory])
+
+  const getModeInfo = (mode) => {
+    switch (mode) {
+      case 'full':
+        return { icon: Trophy, color: 'text-emerald-400', bg: 'bg-emerald-900/50', label: 'Full Exam' }
+      case 'study':
+        return { icon: Star, color: 'text-violet-400', bg: 'bg-violet-900/50', label: 'Study' }
+      default:
+        return { icon: BookOpen, color: 'text-blue-400', bg: 'bg-blue-900/50', label: 'Practice' }
+    }
+  }
 
   if (allHistory.length === 0) {
     return (
@@ -121,13 +134,22 @@ export default function Analytics() {
             <p className="text-slate-400 mb-6">
               Complete some practice sessions or exams to see your analytics
             </p>
-            <Link 
-              to="/practice" 
-              className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-500 transition-colors"
-            >
-              <BookOpen className="w-5 h-5" />
-              Start Practicing
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link 
+                to="/study-setup" 
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-violet-600 text-white font-semibold rounded-xl hover:bg-violet-500 transition-colors"
+              >
+                <Star className="w-5 h-5" />
+                Start Studying
+              </Link>
+              <Link 
+                to="/practice" 
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-500 transition-colors"
+              >
+                <BookOpen className="w-5 h-5" />
+                Start Practicing
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -269,12 +291,20 @@ export default function Analytics() {
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
                       {modeDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index]} />
+                        <Cell key={`cell-${index}`} fill={entry.color || COLORS[index]} />
                       ))}
                     </Pie>
                     <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }} />
                   </PieChart>
                 </ResponsiveContainer>
+                <div className="flex justify-center gap-4 mt-4">
+                  {modeDistribution.map((entry) => (
+                    <div key={entry.name} className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
+                      <span className="text-sm text-slate-400">{entry.name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -302,43 +332,42 @@ export default function Analytics() {
           <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
             <h3 className="font-semibold text-white mb-4">Recent Sessions</h3>
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {allHistory.slice().reverse().slice(0, 10).map((session) => (
-                <div key={session.id} className="p-4 rounded-xl bg-slate-700/50 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      session.mode === 'full' ? 'bg-emerald-900/50' : 'bg-blue-900/50'
-                    }`}>
-                      {session.mode === 'full' 
-                        ? <Award className="w-5 h-5 text-emerald-400" />
-                        : <BookOpen className="w-5 h-5 text-blue-400" />
-                      }
+              {allHistory.slice().reverse().slice(0, 10).map((session) => {
+                const modeInfo = getModeInfo(session.mode)
+                const ModeIcon = modeInfo.icon
+                return (
+                  <div key={session.id} className="p-4 rounded-xl bg-slate-700/50 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${modeInfo.bg}`}>
+                        <ModeIcon className={`w-5 h-5 ${modeInfo.color}`} />
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">
+                          {session.mode === 'full' ? 'Full Exam' : session.subjects?.[0] || modeInfo.label}
+                        </p>
+                        <p className="text-xs text-slate-400 flex items-center gap-2">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(session.date).toLocaleDateString()}
+                          <Clock className="w-3 h-3 ml-2" />
+                          {Math.round(session.duration / 60)}m
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-white">
-                        {session.mode === 'full' ? 'Full Exam' : session.subjects?.[0] || 'Practice'}
+                    <div className="text-right">
+                      <p className={`text-lg font-bold ${
+                        session.overallScore >= 70 ? 'text-emerald-400' :
+                        session.overallScore >= 50 ? 'text-amber-400' :
+                        'text-red-400'
+                      }`}>
+                        {session.overallScore}%
                       </p>
-                      <p className="text-xs text-slate-400 flex items-center gap-2">
-                        <Calendar className="w-3 h-3" />
-                        {new Date(session.date).toLocaleDateString()}
-                        <Clock className="w-3 h-3 ml-2" />
-                        {Math.round(session.duration / 60)}m
+                      <p className="text-xs text-slate-400">
+                        {session.totalCorrect}/{session.totalQuestions}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className={`text-lg font-bold ${
-                      session.overallScore >= 70 ? 'text-emerald-400' :
-                      session.overallScore >= 50 ? 'text-amber-400' :
-                      'text-red-400'
-                    }`}>
-                      {session.overallScore}%
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      {session.totalCorrect}/{session.totalQuestions}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </motion.div>

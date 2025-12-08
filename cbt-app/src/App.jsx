@@ -13,9 +13,12 @@ import Review from './pages/Review'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
 import Bookmarks from './pages/Bookmarks'
+import StudySetup from './pages/StudySetup'
+import Study from './pages/Study'
+import Profile from './pages/Profile'
 
 function App() {
-  const { theme, fontSize } = useStore()
+  const { theme, fontSize, createGuestProfile, isLoggedIn } = useStore()
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -47,6 +50,12 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!isLoggedIn) {
+      createGuestProfile('Student')
+    }
+  }, [isLoggedIn, createGuestProfile])
+
   return (
     <div className="min-h-screen bg-slate-900 transition-colors duration-300">
       <AnimatePresence mode="wait">
@@ -62,6 +71,9 @@ function App() {
             <Route path="analytics" element={<Analytics />} />
             <Route path="settings" element={<Settings />} />
             <Route path="bookmarks" element={<Bookmarks />} />
+            <Route path="study-setup" element={<StudySetup />} />
+            <Route path="study" element={<Study />} />
+            <Route path="profile" element={<Profile />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
