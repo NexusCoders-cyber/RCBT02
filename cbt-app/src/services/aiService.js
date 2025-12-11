@@ -1,7 +1,5 @@
-const GROK_API_KEY = import.meta.env.VITE_GROK_API_KEY || ''
-const CEREBRAS_API_KEY = import.meta.env.VITE_CEREBRAS_API_KEY || ''
-
-const GROK_API_URL = 'https://api.x.ai/v1/chat/completions'
+const POE_API_KEY = import.meta.env.VITE_POE_API_KEY || ''
+const POE_API_URL = 'https://api.poe.com/v1/chat/completions'
 
 const DB_NAME = 'jamb-cbt-offline'
 const DB_VERSION = 2
@@ -107,7 +105,7 @@ export async function askAI(question, subject = null, context = null) {
     throw new Error('You are offline. AI assistance requires an internet connection.')
   }
   
-  if (!GROK_API_KEY) {
+  if (!POE_API_KEY) {
     throw new Error('AI service is not configured.')
   }
   
@@ -120,14 +118,14 @@ export async function askAI(question, subject = null, context = null) {
   }
   
   try {
-    const response = await fetch(GROK_API_URL, {
+    const response = await fetch(POE_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROK_API_KEY}`
+        'Authorization': `Bearer ${POE_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'grok-3-latest',
+        model: 'Grok-4',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userMessage }
