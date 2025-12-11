@@ -16,6 +16,7 @@ import Bookmarks from './pages/Bookmarks'
 import StudySetup from './pages/StudySetup'
 import Study from './pages/Study'
 import Profile from './pages/Profile'
+import NovelPage from './pages/NovelPage'
 
 function App() {
   const { theme, fontSize, createGuestProfile, isLoggedIn } = useStore()
@@ -74,6 +75,7 @@ function App() {
             <Route path="study-setup" element={<StudySetup />} />
             <Route path="study" element={<Study />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="novel" element={<NovelPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
