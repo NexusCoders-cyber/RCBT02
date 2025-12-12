@@ -1,119 +1,97 @@
-# ALOC Questions API & JAMB CBT Practice App
+# JAMB CBT Practice App
 
 ## Overview
+A modern Computer-Based Test (CBT) practice application for JAMB UTME preparation. Built with React + Vite, featuring AI-powered learning assistance via Google Gemini 2.5 Flash.
 
-This repository contains two main applications:
+## Current State
+Version 2.0.0 - AI-powered release with the following major features:
+- Gemini 2.5 Flash AI integration with image understanding
+- Persistent conversation memory for AI assistant
+- Offline question storage via IndexedDB
+- AI-generated flashcards based on JAMB syllabus
+- Dynamic novel analysis generation for Literature
 
-1. **ALOC Questions API (Backend)** - A Laravel 8 PHP application that provides API access to over 6,000 Nigerian past examination questions (UTME, WASSCE, POST-UTME). This serves as an open-source database for educational content.
+## Tech Stack
+- Frontend: React 18 with Vite
+- State Management: Zustand
+- Styling: Tailwind CSS
+- Animations: Framer Motion
+- AI: Google Gemini 2.5 Flash API
+- Offline Storage: IndexedDB
+- Questions API: ALOC API
 
-2. **JAMB CBT Practice App (Frontend)** - A modern React 19 single-page application built with Vite that provides a computer-based testing (CBT) practice interface for JAMB UTME preparation. Located in the `cbt-app/` directory.
+## Project Structure
+```
+cbt-app/
+├── src/
+│   ├── components/          # Reusable UI components
+│   │   ├── AIAssistant.jsx  # AI chat interface with image upload
+│   │   ├── Flashcards.jsx   # AI-generated flashcard system
+│   │   ├── Dictionary.jsx   # Word lookup component
+│   │   └── ...
+│   ├── pages/               # Route pages
+│   │   ├── Dashboard.jsx    # Main dashboard
+│   │   ├── NovelPage.jsx    # Literature study with AI generation
+│   │   ├── Settings.jsx     # App settings
+│   │   └── ...
+│   ├── services/            # API and service layers
+│   │   ├── aiService.js     # Gemini AI integration
+│   │   ├── api.js           # ALOC API for questions
+│   │   └── offlineStorage.js # IndexedDB operations
+│   ├── data/
+│   │   └── jambSyllabus.js  # JAMB syllabus topics for all subjects
+│   └── store/
+│       └── useStore.js      # Zustand state management
+└── vite.config.js           # Vite configuration
+```
 
-The platform aims to gamify academic practice, making exam preparation engaging for students seeking university admission in Nigeria.
+## Key Features
+
+### AI Assistant (Ilom)
+- Powered by Gemini 2.5 Flash with vision capabilities
+- Supports image upload for diagram/graph analysis
+- Maintains conversation history across sessions
+- Provides detailed explanations with structured breakdowns
+- Subject-specific study tips
+
+### Offline Support
+- Questions cached to IndexedDB (not browser cache)
+- Works offline with previously cached questions
+- Flashcards stored locally
+- Novel analyses saved for offline access
+
+### Flashcard System
+- AI-generated flashcards based on JAMB syllabus topics
+- Covers all 15 JAMB subjects
+- Study mode with progress tracking
+- Manual card creation supported
+
+### Novel Analysis
+- Dynamic generation via AI for any JAMB Literature text
+- Generates: plot summary, chapters, characters, themes, literary devices
+- Creates practice questions with explanations
+- Replaces hardcoded content with flexible AI generation
+
+## Environment Variables
+- `GEMINI_API_KEY` - Google Gemini API key (stored as secret)
+
+## JAMB Subjects Covered
+English, Mathematics, Physics, Chemistry, Biology, Literature, Government, Commerce, Accounting, Economics, CRK, IRK, Geography, Agricultural Science, History
+
+## Recent Changes (December 2025)
+- Upgraded from Poe API to Gemini 2.5 Flash
+- Added image analysis capability to AI assistant
+- Implemented persistent AI conversation memory
+- Created comprehensive JAMB syllabus data for flashcard generation
+- Replaced hardcoded "Lekki Headmaster" with dynamic novel generation
+- Removed all "Powered by ALOC" branding
+- Enhanced offline storage with proper IndexedDB implementation
+- Removed all code comments for cleaner production code
+
+## Development
+Run `npm run dev` in the cbt-app directory to start the development server on port 5000.
 
 ## User Preferences
-
-Preferred communication style: Simple, everyday language.
-
-## System Architecture
-
-### Backend Architecture (Laravel)
-
-**Framework**: Laravel 8.x with PHP 7.3+/8.0
-
-**Key Components**:
-- Standard Laravel MVC architecture with models, controllers, and views
-- Eloquent ORM for database interactions
-- Custom helper functions loaded via `app/functions.php`
-- API-first design exposing endpoints at `questions.aloc.com.ng/api/v2`
-
-**Third-Party Packages**:
-- `guzzlehttp/guzzle` - HTTP client for external API calls
-- `laracasts/flash` - Flash messaging for user notifications
-- `stevebauman/location` - IP geolocation services
-- `fruitcake/laravel-cors` - Cross-origin resource sharing
-
-**Asset Compilation**: Laravel Mix with Webpack for JS/CSS bundling
-
-### Frontend Architecture (React CBT App)
-
-**Location**: `cbt-app/` directory
-
-**Framework**: React 19 with Vite 7 as build tool
-
-**State Management**: Zustand with persistence middleware for local storage
-
-**Styling**: Tailwind CSS 4 with custom theme configuration including:
-- Custom color palettes (primary blue, secondary green)
-- Dark mode support via CSS class toggle
-- Custom animations (fade-in, slide-up, slide-down)
-- Plus Jakarta Sans as primary font
-
-**UI Libraries**:
-- Headless UI - Accessible UI components
-- Framer Motion - Animations and transitions
-- Lucide React - Icon library
-- Recharts - Data visualization/charts
-
-**Key Services**:
-- `api.js` - Axios-based API client with IndexedDB caching for offline support
-- `aiService.js` - AI integration with Poe API for question explanations (with caching)
-- `voiceService.js` - Text-to-speech functionality for accessibility
-
-**PWA Features**:
-- Service worker (`public/sw.js`) for offline caching
-- Web manifest for installable app experience
-- Static asset and API response caching strategies
-
-### Data Flow
-
-1. Frontend makes requests to ALOC API (`questions.aloc.com.ng/api/v2`)
-2. API responses are cached in IndexedDB for offline access
-3. User progress and preferences stored locally via Zustand persist
-4. AI explanations fetched from Poe API and cached for 24 hours
-
-### Store Structure (Zustand)
-
-The main store (`useStore.js`) manages:
-- Theme and display preferences
-- Subject configurations (15 JAMB subjects with metadata)
-- User profile and progress tracking
-- Practice session state
-- Achievement system
-
-## External Dependencies
-
-### Backend (Laravel)
-
-**Database**: MySQL/MariaDB (configured via `.env` file with `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`)
-
-**External Services**:
-- No external API dependencies; this IS the API provider
-
-### Frontend (React)
-
-**APIs**:
-- ALOC Questions API (`https://questions.aloc.com.ng/api/v2`) - Primary data source with access token authentication
-- Dictionary API (`api.dictionaryapi.dev`) - Word definitions
-- Poe API (`api.poe.com/v1`) - AI-powered question explanations using Grok-4 model
-
-**Environment Variables**:
-- `VITE_ALOC_API_URL` - API base URL (default: `https://questions.aloc.com.ng/api/v2`)
-- `VITE_ALOC_ACCESS_TOKEN` - API access token (default provided)
-- `VITE_POE_API_KEY` - Poe API key for AI features (configured)
-
-**Browser APIs**:
-- IndexedDB - Offline question caching
-- Web Speech API - Text-to-speech for questions
-- Service Worker API - PWA functionality
-
-### Development Tools
-
-**Backend**:
-- PHPUnit for testing
-- Laravel Sail for Docker development
-- Faker for database seeding
-
-**Frontend**:
-- ESLint with React hooks plugin
-- PostCSS with Autoprefixer
-- Vite dev server on port 5000
+- Dark theme by default
+- No code comments in production code
+- Clean, professional UI without external branding

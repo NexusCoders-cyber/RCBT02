@@ -4,10 +4,12 @@ import { motion } from 'framer-motion'
 import { 
   Rocket, BookOpen, TrendingUp, 
   Trophy, GraduationCap, Bookmark, ChevronRight, Sparkles, Book,
-  User, Flame, Star, WifiOff, Wifi, Download
+  User, Flame, Star, WifiOff, Wifi, Download, Brain, Bot
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import Dictionary from '../components/Dictionary'
+import Flashcards from '../components/Flashcards'
+import AIAssistant from '../components/AIAssistant'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -24,12 +26,12 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 }
 
-const FeatureCard = ({ to, icon: Icon, title, description, bgColor, textColor, iconBg, badge }) => (
-  <Link to={to} className="block group">
+const FeatureCard = ({ to, icon: Icon, title, description, bgColor, textColor, iconBg, badge, onClick }) => {
+  const content = (
     <motion.div
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className={`${bgColor} rounded-2xl p-5 h-full transition-all duration-300 group-hover:shadow-lg relative overflow-hidden`}
+      className={`${bgColor} rounded-2xl p-5 h-full transition-all duration-300 hover:shadow-lg relative overflow-hidden`}
     >
       {badge && (
         <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-yellow-500 text-yellow-900 text-xs font-bold">
@@ -42,8 +44,22 @@ const FeatureCard = ({ to, icon: Icon, title, description, bgColor, textColor, i
       <h3 className={`font-bold ${textColor} text-lg mb-1`}>{title}</h3>
       <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">{description}</p>
     </motion.div>
-  </Link>
-)
+  )
+
+  if (onClick) {
+    return (
+      <button onClick={onClick} className="block group text-left w-full">
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <Link to={to} className="block group">
+      {content}
+    </Link>
+  )
+}
 
 export default function Dashboard() {
   const { 
@@ -55,6 +71,8 @@ export default function Dashboard() {
     isOnline,
   } = useStore()
   const [showDictionary, setShowDictionary] = useState(false)
+  const [showFlashcards, setShowFlashcards] = useState(false)
+  const [showAI, setShowAI] = useState(false)
   const [cachedCount, setCachedCount] = useState(0)
 
   useEffect(() => {
@@ -194,27 +212,28 @@ export default function Dashboard() {
               iconBg="bg-pink-200 dark:bg-pink-800/50"
             />
             <FeatureCard
-              to="/analytics"
-              icon={TrendingUp}
-              title="Analytics"
-              description="Track your progress"
-              bgColor="bg-cyan-100 dark:bg-cyan-900/30"
-              textColor="text-cyan-700 dark:text-cyan-400"
-              iconBg="bg-cyan-200 dark:bg-cyan-800/50"
+              icon={Bot}
+              title="AI Tutor"
+              description="Ask anything, get help"
+              bgColor="bg-emerald-100 dark:bg-emerald-900/30"
+              textColor="text-emerald-700 dark:text-emerald-400"
+              iconBg="bg-emerald-200 dark:bg-emerald-800/50"
+              onClick={() => setShowAI(true)}
+              badge="AI"
             />
           </motion.div>
 
-          <motion.div variants={itemVariants} className="grid grid-cols-3 gap-3">
+          <motion.div variants={itemVariants} className="grid grid-cols-4 gap-3">
             <Link to="/bookmarks" className="block group">
               <div className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl p-4 h-full transition-all duration-300 group-hover:shadow-lg border border-amber-200 dark:border-amber-800/30">
                 <div className="flex flex-col items-center text-center gap-2">
-                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-800/50 rounded-xl flex items-center justify-center">
-                    <Bookmark className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                  <div className="w-10 h-10 bg-amber-100 dark:bg-amber-800/50 rounded-xl flex items-center justify-center">
+                    <Bookmark className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-amber-700 dark:text-amber-400 text-sm">Bookmarks</h3>
+                    <h3 className="font-bold text-amber-700 dark:text-amber-400 text-xs">Bookmarks</h3>
                     <p className="text-slate-500 dark:text-slate-400 text-xs">
-                      {bookmarkedQuestions.length > 0 ? `${bookmarkedQuestions.length} saved` : 'Save questions'}
+                      {bookmarkedQuestions.length || 0}
                     </p>
                   </div>
                 </div>
@@ -223,29 +242,38 @@ export default function Dashboard() {
             <button onClick={() => setShowDictionary(true)} className="block group text-left">
               <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-4 h-full transition-all duration-300 group-hover:shadow-lg border border-indigo-200 dark:border-indigo-800/30">
                 <div className="flex flex-col items-center text-center gap-2">
-                  <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-800/50 rounded-xl flex items-center justify-center">
-                    <Book className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                  <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-800/50 rounded-xl flex items-center justify-center">
+                    <Book className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-indigo-700 dark:text-indigo-400 text-sm">Dictionary</h3>
-                    <p className="text-slate-500 dark:text-slate-400 text-xs">Look up words</p>
+                    <h3 className="font-bold text-indigo-700 dark:text-indigo-400 text-xs">Dictionary</h3>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs">Words</p>
                   </div>
                 </div>
               </div>
             </button>
-            <Link to="/profile" className="block group">
-              <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl p-4 h-full transition-all duration-300 group-hover:shadow-lg border border-emerald-200 dark:border-emerald-800/30">
+            <button onClick={() => setShowFlashcards(true)} className="block group text-left">
+              <div className="bg-orange-50 dark:bg-orange-900/20 rounded-2xl p-4 h-full transition-all duration-300 group-hover:shadow-lg border border-orange-200 dark:border-orange-800/30">
                 <div className="flex flex-col items-center text-center gap-2">
-                  <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-800/50 rounded-xl flex items-center justify-center overflow-hidden">
-                    {userProfile.avatar ? (
-                      <img src={userProfile.avatar} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                    )}
+                  <div className="w-10 h-10 bg-orange-100 dark:bg-orange-800/50 rounded-xl flex items-center justify-center">
+                    <Brain className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">Profile</h3>
-                    <p className="text-slate-500 dark:text-slate-400 text-xs">{totalSessions} sessions</p>
+                    <h3 className="font-bold text-orange-700 dark:text-orange-400 text-xs">Flashcards</h3>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs">Study</p>
+                  </div>
+                </div>
+              </div>
+            </button>
+            <Link to="/analytics" className="block group">
+              <div className="bg-cyan-50 dark:bg-cyan-900/20 rounded-2xl p-4 h-full transition-all duration-300 group-hover:shadow-lg border border-cyan-200 dark:border-cyan-800/30">
+                <div className="flex flex-col items-center text-center gap-2">
+                  <div className="w-10 h-10 bg-cyan-100 dark:bg-cyan-800/50 rounded-xl flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-cyan-700 dark:text-cyan-400 text-xs">Analytics</h3>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs">Stats</p>
                   </div>
                 </div>
               </div>
@@ -322,13 +350,32 @@ export default function Dashboard() {
           )}
 
           <motion.div variants={itemVariants} className="pt-4">
-            <p className="text-center text-slate-500 text-sm">
-              Powered by ALOC API • Works Offline
-            </p>
+            <Link to="/profile" className="block">
+              <div className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-2xl p-4 border border-slate-600 hover:border-slate-500 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center overflow-hidden">
+                      {userProfile.avatar ? (
+                        <img src={userProfile.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-5 h-5 text-slate-300" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-white">{userProfile.name || 'Set up your profile'}</p>
+                      <p className="text-sm text-slate-400">{totalSessions} practice sessions</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-slate-400" />
+                </div>
+              </div>
+            </Link>
           </motion.div>
         </motion.div>
       </div>
       <Dictionary isOpen={showDictionary} onClose={() => setShowDictionary(false)} />
+      <Flashcards isOpen={showFlashcards} onClose={() => setShowFlashcards(false)} />
+      <AIAssistant isOpen={showAI} onClose={() => setShowAI(false)} />
     </div>
   )
 }

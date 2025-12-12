@@ -2,9 +2,17 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   X, Send, Bot, Loader2, Sparkles, 
-  BookOpen, Lightbulb, HelpCircle, MessageSquare
+  BookOpen, Lightbulb, Image, Trash2, History
 } from 'lucide-react'
-import { askAI, explainQuestion, getStudyTips, clarifyTopic } from '../services/aiService'
+import { 
+  askAI, 
+  explainQuestion, 
+  getStudyTips, 
+  clarifyTopic,
+  analyzeImage,
+  loadConversationHistory,
+  clearConversationHistory
+} from '../services/aiService'
 import useStore from '../store/useStore'
 
 export default function AIAssistant({ isOpen, onClose, currentQuestion = null, currentSubject = null }) {
@@ -12,23 +20,35 @@ export default function AIAssistant({ isOpen, onClose, currentQuestion = null, c
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [quickAction, setQuickAction] = useState(null)
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
+  const [showHistory, setShowHistory] = useState(false)
   const messagesEndRef = useRef(null)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
-    if (isOpen && messages.length === 0) {
-      setMessages([{
-        role: 'assistant',
-        content: `Hello! I'm Ilom, your JAMB study assistant. I can help you with:
+    const initializeChat = async () => {
+      if (isOpen && messages.length === 0) {
+        const savedHistory = await loadConversationHistory()
+        if (savedHistory.length > 0) {
+          setMessages(savedHistory)
+        } else {
+          setMessages([{
+            role: 'assistant',
+            content: `Hello! I'm Ilom, your JAMB study assistant powered by advanced AI. I can help you with:
 
-• Explaining difficult concepts
-• Breaking down JAMB questions
-• Providing study tips
-• Clarifying topics in any subject
+• Explaining difficult concepts in any subject
+• Breaking down JAMB questions step by step
+• Providing personalized study tips
+• Clarifying topics from the JAMB syllabus
+• Analyzing images, diagrams, and graphs
 
-How can I help you prepare for your exams today?`
-      }])
+I remember our previous conversations to better assist you. How can I help you prepare for your exams today?`
+          }])
+        }
+      }
     }
+    initializeChat()
   }, [isOpen, messages.length])
 
   useEffect(() => {
@@ -37,16 +57,58 @@ How can I help you prepare for your exams today?`
     }
   }, [messages])
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: 'Image is too large. Please select an image smaller than 5MB.'
+        }])
+        return
+      }
+      
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setSelectedImage(reader.result)
+        setImagePreview(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
-    const userMessage = input.trim()
+  const clearImage = () => {
+    setSelectedImage(null)
+    setImagePreview(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const handleSend = async () => {
+    if ((!input.trim() && !selectedImage) || isLoading) return
+
+    const userMessage = input.trim() || 'Please analyze this image and explain what it shows.'
+    const hasImage = !!selectedImage
+    
     setInput('')
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    setMessages(prev => [...prev, { 
+      role: 'user', 
+      content: userMessage,
+      image: imagePreview
+    }])
+    
+    const imageToSend = selectedImage
+    clearImage()
     setIsLoading(true)
 
     try {
-      const response = await askAI(userMessage, currentSubject?.name)
+      let response
+      if (hasImage) {
+        response = await analyzeImage(imageToSend, userMessage, currentSubject?.name)
+      } else {
+        response = await askAI(userMessage, currentSubject?.name)
+      }
       setMessages(prev => [...prev, { role: 'assistant', content: response }])
     } catch (error) {
       setMessages(prev => [...prev, { 
@@ -61,11 +123,10 @@ How can I help you prepare for your exams today?`
   const handleExplainQuestion = async () => {
     if (!currentQuestion || isLoading) return
 
-    setQuickAction('explain')
     setIsLoading(true)
     setMessages(prev => [...prev, { 
       role: 'user', 
-      content: 'Please explain this question to me.' 
+      content: 'Please explain this question to me with a detailed breakdown.' 
     }])
 
     try {
@@ -83,7 +144,6 @@ How can I help you prepare for your exams today?`
       }])
     } finally {
       setIsLoading(false)
-      setQuickAction(null)
     }
   }
 
@@ -91,7 +151,6 @@ How can I help you prepare for your exams today?`
     if (isLoading) return
 
     const subject = currentSubject?.name || 'General Studies'
-    setQuickAction('tips')
     setIsLoading(true)
     setMessages(prev => [...prev, { 
       role: 'user', 
@@ -108,7 +167,6 @@ How can I help you prepare for your exams today?`
       }])
     } finally {
       setIsLoading(false)
-      setQuickAction(null)
     }
   }
 
@@ -119,7 +177,8 @@ How can I help you prepare for your exams today?`
     }
   }
 
-  const clearChat = () => {
+  const clearChat = async () => {
+    await clearConversationHistory()
     setMessages([{
       role: 'assistant',
       content: 'Chat cleared. I\'m Ilom - how can I help you with your JAMB preparation?'
@@ -151,18 +210,22 @@ How can I help you prepare for your exams today?`
                 <Bot className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="font-bold text-white">Ilom</h3>
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  Ilom
+                  <span className="text-xs bg-emerald-600/30 text-emerald-400 px-2 py-0.5 rounded-full">AI</span>
+                </h3>
                 <p className="text-xs text-slate-400">
-                  {isOnline ? 'Online' : 'Offline - Limited features'}
+                  {isOnline ? 'Online • Remembers conversations' : 'Offline - Limited features'}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={clearChat}
-                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors text-sm"
+                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                title="Clear chat"
               >
-                Clear
+                <Trash2 className="w-4 h-4" />
               </button>
               <button
                 onClick={onClose}
@@ -230,7 +293,30 @@ How can I help you prepare for your exams today?`
                       <span className="text-xs font-medium text-emerald-400">Ilom</span>
                     </div>
                   )}
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+                  {message.image && (
+                    <img 
+                      src={message.image} 
+                      alt="Uploaded" 
+                      className="max-w-full h-auto rounded-lg mb-2 max-h-40 object-contain"
+                    />
+                  )}
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
+                    {message.content.split('\n').map((line, i) => {
+                      if (line.startsWith('**') && line.endsWith('**')) {
+                        return <p key={i} className="font-bold text-emerald-300 mt-3 mb-1">{line.replace(/\*\*/g, '')}</p>
+                      }
+                      if (line.startsWith('---')) {
+                        return <hr key={i} className="border-slate-600 my-3" />
+                      }
+                      if (line.match(/^\d+\./)) {
+                        return <p key={i} className="ml-2 my-1">{line}</p>
+                      }
+                      if (line.startsWith('•') || line.startsWith('-')) {
+                        return <p key={i} className="ml-4 my-1">{line}</p>
+                      }
+                      return <p key={i} className="my-1">{line}</p>
+                    })}
+                  </div>
                 </div>
               </div>
             ))}
@@ -255,7 +341,39 @@ How can I help you prepare for your exams today?`
                 You are offline. AI features require internet connection.
               </p>
             )}
+            
+            {imagePreview && (
+              <div className="mb-3 relative inline-block">
+                <img 
+                  src={imagePreview} 
+                  alt="Preview" 
+                  className="h-20 w-auto rounded-lg border border-slate-600"
+                />
+                <button
+                  onClick={clearImage}
+                  className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+            
             <div className="flex items-end gap-2">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageSelect}
+                accept="image/*"
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!isOnline}
+                className="p-3 rounded-xl bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors disabled:opacity-50"
+                title="Upload image"
+              >
+                <Image className="w-5 h-5" />
+              </button>
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -267,7 +385,7 @@ How can I help you prepare for your exams today?`
               />
               <button
                 onClick={handleSend}
-                disabled={!input.trim() || isLoading || !isOnline}
+                disabled={(!input.trim() && !selectedImage) || isLoading || !isOnline}
                 className="p-3 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-5 h-5" />

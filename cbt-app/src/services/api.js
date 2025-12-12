@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { getNovelQuestions } from '../data/lekkiHeadmaster'
 
 const API_URL = import.meta.env.VITE_ALOC_API_URL || 'https://questions.aloc.com.ng/api/v2'
 const ACCESS_TOKEN = import.meta.env.VITE_ALOC_ACCESS_TOKEN || 'QB-1e5c5f1553ccd8cd9e11'
@@ -29,7 +28,7 @@ apiClient.interceptors.response.use(
 )
 
 const DB_NAME = 'jamb-cbt-offline'
-const DB_VERSION = 2
+const DB_VERSION = 4
 const QUESTIONS_STORE = 'questions'
 
 let db = null
@@ -93,7 +92,6 @@ async function openDB() {
       const database = event.target.result
       Array.from(database.objectStoreNames).forEach((storeName) => {
         if (storeName !== QUESTIONS_STORE) {
-          database.deleteObjectStore(storeName)
         }
       })
       if (!database.objectStoreNames.contains(QUESTIONS_STORE)) {
@@ -334,17 +332,6 @@ export async function loadQuestionsForExam(subjects, onProgress = null) {
         }
       }
       
-      if (subject.id === 'literature') {
-        const novelQuestions = getNovelQuestions()
-        const existingIds = new Set(questions.map(q => q.id))
-        novelQuestions.forEach(q => {
-          if (!existingIds.has(q.id)) {
-            questions.push(q)
-          }
-        })
-        questions = questions.sort(() => Math.random() - 0.5)
-      }
-      
       if (questions.length > 0) {
         await cacheQuestions(cacheKey, questions)
       }
@@ -366,8 +353,6 @@ export async function loadQuestionsForExam(subjects, onProgress = null) {
       const cachedData = await getCachedQuestions(cacheKey)
       if (cachedData && cachedData.length > 0) {
         questionsMap[subject.id] = cachedData.slice(0, count)
-      } else if (subject.id === 'literature') {
-        questionsMap[subject.id] = getNovelQuestions().slice(0, count)
       } else {
         questionsMap[subject.id] = []
       }
@@ -397,17 +382,6 @@ export async function loadPracticeQuestions(subject, count = 40, year = null) {
       }
     }
     
-    if (subject.id === 'literature') {
-      const novelQuestions = getNovelQuestions()
-      const existingIds = new Set(questions.map(q => q.id))
-      novelQuestions.forEach(q => {
-        if (!existingIds.has(q.id)) {
-          questions.push(q)
-        }
-      })
-      questions = questions.sort(() => Math.random() - 0.5)
-    }
-    
     if (questions.length > 0) {
       await cacheQuestions(cacheKey, questions)
     }
@@ -417,10 +391,6 @@ export async function loadPracticeQuestions(subject, count = 40, year = null) {
     const cachedData = await getCachedQuestions(cacheKey)
     if (cachedData && cachedData.length > 0) {
       return cachedData.slice(0, count)
-    }
-    
-    if (subject.id === 'literature') {
-      return getNovelQuestions().slice(0, count)
     }
     
     console.error(`Error loading practice questions:`, error)

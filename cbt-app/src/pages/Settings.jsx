@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
   ArrowLeft, Sun, Moon, Clock, Volume2, Vibrate, Calculator,
-  Type, Trash2, AlertTriangle, Check, Info
+  Type, Trash2, AlertTriangle, Check, Info, Sparkles
 } from 'lucide-react'
 import useStore from '../store/useStore'
 
@@ -247,23 +247,24 @@ export default function Settings() {
           </div>
 
           <div className="bg-gradient-to-r from-emerald-900/30 to-blue-900/30 rounded-2xl p-6 border border-slate-700">
-            <h3 className="font-semibold text-white mb-2">About JAMB CBT Practice</h3>
+            <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-400" />
+              About JAMB CBT Practice
+            </h3>
             <p className="text-sm text-slate-400 mb-4">
-              A modern CBT practice platform powered by the ALOC API. Practice JAMB questions 
-              with official exam format and track your progress.
+              A modern CBT practice platform with AI-powered learning assistance. Practice JAMB questions 
+              with official exam format, get AI explanations, and track your progress.
             </p>
             <div className="flex flex-wrap gap-2 text-xs">
               <span className="px-3 py-1 rounded-full bg-slate-700 text-slate-300">
-                Version 1.0.0
+                Version 2.0.0
               </span>
-              <a 
-                href="https://questions.aloc.com.ng" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="px-3 py-1 rounded-full bg-emerald-600 text-white hover:bg-emerald-500 transition-colors"
-              >
-                ALOC API
-              </a>
+              <span className="px-3 py-1 rounded-full bg-emerald-600/20 text-emerald-400">
+                AI Powered
+              </span>
+              <span className="px-3 py-1 rounded-full bg-blue-600/20 text-blue-400">
+                Works Offline
+              </span>
             </div>
           </div>
         </motion.div>

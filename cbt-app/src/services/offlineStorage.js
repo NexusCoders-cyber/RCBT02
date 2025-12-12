@@ -1,8 +1,9 @@
 const DB_NAME = 'jamb-cbt-offline'
-const DB_VERSION = 3
+const DB_VERSION = 4
 const QUESTIONS_STORE = 'questions'
 const FLASHCARDS_STORE = 'flashcards'
 const NOVEL_STORE = 'novel'
+const GENERATED_CONTENT_STORE = 'generated_content'
 
 let db = null
 
@@ -39,6 +40,14 @@ export async function openDB() {
       
       if (!database.objectStoreNames.contains('ai_cache')) {
         database.createObjectStore('ai_cache', { keyPath: 'cacheKey' })
+      }
+      
+      if (!database.objectStoreNames.contains('ai_history')) {
+        database.createObjectStore('ai_history', { keyPath: 'id' })
+      }
+      
+      if (!database.objectStoreNames.contains(GENERATED_CONTENT_STORE)) {
+        database.createObjectStore(GENERATED_CONTENT_STORE, { keyPath: 'id' })
       }
     }
   })
@@ -250,6 +259,58 @@ export async function getNovelContent(id) {
   }
 }
 
+export async function getAllNovels() {
+  try {
+    const database = await openDB()
+    
+    return new Promise((resolve) => {
+      const transaction = database.transaction(NOVEL_STORE, 'readonly')
+      const store = transaction.objectStore(NOVEL_STORE)
+      const request = store.getAll()
+      
+      request.onsuccess = () => resolve(request.result || [])
+      request.onerror = () => resolve([])
+    })
+  } catch {
+    return []
+  }
+}
+
+export async function saveGeneratedContent(id, content) {
+  try {
+    const database = await openDB()
+    
+    return new Promise((resolve) => {
+      const transaction = database.transaction(GENERATED_CONTENT_STORE, 'readwrite')
+      const store = transaction.objectStore(GENERATED_CONTENT_STORE)
+      
+      store.put({ id, content, timestamp: Date.now() })
+      
+      transaction.oncomplete = () => resolve(true)
+      transaction.onerror = () => resolve(false)
+    })
+  } catch {
+    return false
+  }
+}
+
+export async function getGeneratedContent(id) {
+  try {
+    const database = await openDB()
+    
+    return new Promise((resolve) => {
+      const transaction = database.transaction(GENERATED_CONTENT_STORE, 'readonly')
+      const store = transaction.objectStore(GENERATED_CONTENT_STORE)
+      const request = store.get(id)
+      
+      request.onsuccess = () => resolve(request.result?.content || null)
+      request.onerror = () => resolve(null)
+    })
+  } catch {
+    return null
+  }
+}
+
 export async function getCacheStats() {
   try {
     const database = await openDB()
@@ -298,6 +359,45 @@ export async function getCacheStats() {
   }
 }
 
+export async function downloadQuestionsForOffline(subjects, onProgress = null) {
+  const results = { success: [], failed: [] }
+  
+  for (let i = 0; i < subjects.length; i++) {
+    const subject = subjects[i]
+    try {
+      const response = await fetch(`https://questions.aloc.com.ng/api/v2/m?subject=${subject.id}&type=utme`, {
+        headers: {
+          'AccessToken': 'QB-1e5c5f1553ccd8cd9e11'
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        const questions = data.data || data || []
+        
+        if (questions.length > 0) {
+          await saveQuestionsToCache(subject.id, 'offline', questions)
+          results.success.push(subject.id)
+        }
+      }
+    } catch (error) {
+      results.failed.push(subject.id)
+    }
+    
+    if (onProgress) {
+      onProgress({
+        current: i + 1,
+        total: subjects.length,
+        subject: subject.name,
+        success: results.success.length,
+        failed: results.failed.length
+      })
+    }
+  }
+  
+  return results
+}
+
 export default {
   openDB,
   saveQuestionsToCache,
@@ -309,5 +409,9 @@ export default {
   updateFlashcardProgress,
   saveNovelContent,
   getNovelContent,
-  getCacheStats
+  getAllNovels,
+  saveGeneratedContent,
+  getGeneratedContent,
+  getCacheStats,
+  downloadQuestionsForOffline
 }

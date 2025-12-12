@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   X, RotateCcw, ChevronLeft, ChevronRight, Plus, 
   Check, Trash2, Shuffle, BookOpen, Sparkles, Brain,
-  Loader2, Zap, ArrowLeft
+  Loader2, Zap, ArrowLeft, Wand2
 } from 'lucide-react'
 import { 
   getFlashcards, 
@@ -11,7 +11,8 @@ import {
   deleteFlashcard,
   updateFlashcardProgress 
 } from '../services/offlineStorage'
-import { getNovelFlashcards } from '../data/lekkiHeadmaster'
+import { generateFlashcards } from '../services/aiService'
+import { JAMB_SYLLABUS, getTopicsForSubject } from '../data/jambSyllabus'
 import useStore from '../store/useStore'
 
 export default function Flashcards({ isOpen, onClose }) {
@@ -21,6 +22,7 @@ export default function Flashcards({ isOpen, onClose }) {
   const [isFlipped, setIsFlipped] = useState(false)
   const [selectedSubject, setSelectedSubject] = useState(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [mode, setMode] = useState('browse')
   const [studyStats, setStudyStats] = useState({ correct: 0, incorrect: 0 })
@@ -29,15 +31,7 @@ export default function Flashcards({ isOpen, onClose }) {
     setIsLoading(true)
     try {
       const stored = await getFlashcards(selectedSubject?.id || null)
-      const novelCards = selectedSubject?.id === 'literature' || !selectedSubject 
-        ? getNovelFlashcards() 
-        : []
-      
-      const combined = [...stored, ...novelCards.filter(nc => 
-        !stored.some(s => s.id === nc.id)
-      )]
-      
-      setFlashcards(combined)
+      setFlashcards(stored)
       setCurrentIndex(0)
       setIsFlipped(false)
     } catch (error) {
@@ -75,15 +69,13 @@ export default function Flashcards({ isOpen, onClose }) {
   }
 
   const handleDelete = async (id) => {
-    if (id.startsWith('novel-')) return
-    
     await deleteFlashcard(id)
     loadFlashcards()
   }
 
   const handleStudyResponse = async (correct) => {
     const card = flashcards[currentIndex]
-    if (card && !card.id.startsWith('novel-')) {
+    if (card) {
       await updateFlashcardProgress(card.id, correct)
     }
     
@@ -100,6 +92,9 @@ export default function Flashcards({ isOpen, onClose }) {
   }
 
   const startStudyMode = () => {
+    if (flashcards.length === 0) {
+      return
+    }
     setMode('study')
     setStudyStats({ correct: 0, incorrect: 0 })
     handleShuffle()
@@ -164,7 +159,7 @@ export default function Flashcards({ isOpen, onClose }) {
                 </div>
                 <div className="text-center">
                   <p className="text-3xl font-bold text-amber-400">
-                    {Math.round((studyStats.correct / flashcards.length) * 100)}%
+                    {flashcards.length > 0 ? Math.round((studyStats.correct / flashcards.length) * 100) : 0}%
                   </p>
                   <p className="text-sm text-slate-400">Accuracy</p>
                 </div>
@@ -196,20 +191,19 @@ export default function Flashcards({ isOpen, onClose }) {
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                   }`}
                 >
-                  All Subjects
+                  All
                 </button>
-                {subjects.slice(0, 6).map((subject) => (
+                {subjects.slice(0, 8).map((subject) => (
                   <button
                     key={subject.id}
                     onClick={() => setSelectedSubject(subject)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-1 ${
+                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-1 ${
                       selectedSubject?.id === subject.id
                         ? 'bg-amber-600 text-white'
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
                     <span>{subject.icon}</span>
-                    <span className="hidden sm:inline">{subject.name}</span>
                   </button>
                 ))}
               </div>
@@ -222,14 +216,24 @@ export default function Flashcards({ isOpen, onClose }) {
                 <div className="text-center py-12">
                   <BookOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-white mb-2">No Flashcards Yet</h3>
-                  <p className="text-slate-400 mb-6">Create your first flashcard to start studying</p>
-                  <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-medium flex items-center gap-2 mx-auto"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Create Flashcard
-                  </button>
+                  <p className="text-slate-400 mb-6">Create flashcards manually or generate them with AI</p>
+                  <div className="flex flex-col sm:flex-row justify-center gap-3">
+                    <button
+                      onClick={() => setShowCreateModal(true)}
+                      className="px-6 py-3 rounded-xl bg-slate-700 text-white font-medium flex items-center gap-2 justify-center hover:bg-slate-600 transition-colors"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Create Manually
+                    </button>
+                    <button
+                      onClick={() => setShowGenerateModal(true)}
+                      disabled={!isOnline}
+                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-medium flex items-center gap-2 justify-center disabled:opacity-50"
+                    >
+                      <Wand2 className="w-5 h-5" />
+                      Generate with AI
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -238,6 +242,14 @@ export default function Flashcards({ isOpen, onClose }) {
                       Card {currentIndex + 1} of {flashcards.length}
                     </span>
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowGenerateModal(true)}
+                        disabled={!isOnline}
+                        className="p-2 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 disabled:opacity-50"
+                        title="Generate with AI"
+                      >
+                        <Wand2 className="w-5 h-5" />
+                      </button>
                       <button
                         onClick={() => setShowCreateModal(true)}
                         className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
@@ -258,7 +270,7 @@ export default function Flashcards({ isOpen, onClose }) {
                           className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 text-white font-medium flex items-center gap-2"
                         >
                           <Zap className="w-4 h-4" />
-                          Study Mode
+                          Study
                         </button>
                       )}
                     </div>
@@ -332,7 +344,7 @@ export default function Flashcards({ isOpen, onClose }) {
                         <ChevronLeft className="w-6 h-6" />
                       </button>
                       
-                      {currentCard && !currentCard.id.startsWith('novel-') && (
+                      {currentCard && (
                         <button
                           onClick={() => handleDelete(currentCard.id)}
                           className="p-3 rounded-xl bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
@@ -377,6 +389,29 @@ export default function Flashcards({ isOpen, onClose }) {
               await saveFlashcard(card)
               loadFlashcards()
               setShowCreateModal(false)
+            }}
+            subjects={subjects}
+            selectedSubject={selectedSubject}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showGenerateModal && (
+          <GenerateFlashcardsModal
+            isOpen={showGenerateModal}
+            onClose={() => setShowGenerateModal(false)}
+            onGenerate={async (cards, subject, topic) => {
+              for (const card of cards) {
+                await saveFlashcard({
+                  ...card,
+                  subject: subject,
+                  topic: topic,
+                  source: 'ai'
+                })
+              }
+              loadFlashcards()
+              setShowGenerateModal(false)
             }}
             subjects={subjects}
             selectedSubject={selectedSubject}
@@ -519,6 +554,155 @@ function CreateFlashcardModal({ isOpen, onClose, onSave, subjects, selectedSubje
             )}
           </button>
         </form>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function GenerateFlashcardsModal({ isOpen, onClose, onGenerate, subjects, selectedSubject }) {
+  const [subject, setSubject] = useState(selectedSubject?.id || 'english')
+  const [topic, setTopic] = useState('')
+  const [count, setCount] = useState(5)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [error, setError] = useState('')
+
+  const topics = getTopicsForSubject(subject)
+
+  const handleGenerate = async () => {
+    if (!topic) {
+      setError('Please select a topic')
+      return
+    }
+
+    setIsGenerating(true)
+    setError('')
+
+    try {
+      const subjectName = subjects.find(s => s.id === subject)?.name || subject
+      const cards = await generateFlashcards(subjectName, topic, count)
+      
+      if (cards && cards.length > 0) {
+        await onGenerate(cards, subject, topic)
+      } else {
+        setError('Failed to generate flashcards. Please try again.')
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to generate flashcards')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-slate-900 w-full max-w-md rounded-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <Wand2 className="w-5 h-5 text-amber-400" />
+            <h3 className="text-lg font-bold text-white">Generate Flashcards</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-slate-400">
+            AI will generate flashcards based on the JAMB syllabus for your selected topic.
+          </p>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-2">
+              Subject
+            </label>
+            <select
+              value={subject}
+              onChange={(e) => {
+                setSubject(e.target.value)
+                setTopic('')
+              }}
+              className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white focus:border-amber-500 focus:outline-none"
+            >
+              {subjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.icon} {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-2">
+              Topic (from JAMB Syllabus)
+            </label>
+            <select
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white focus:border-amber-500 focus:outline-none"
+            >
+              <option value="">Select a topic...</option>
+              {topics.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-2">
+              Number of Cards
+            </label>
+            <select
+              value={count}
+              onChange={(e) => setCount(Number(e.target.value))}
+              className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white focus:border-amber-500 focus:outline-none"
+            >
+              <option value={3}>3 cards</option>
+              <option value={5}>5 cards</option>
+              <option value={10}>10 cards</option>
+            </select>
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-400 bg-red-900/20 p-3 rounded-lg">{error}</p>
+          )}
+
+          <button
+            onClick={handleGenerate}
+            disabled={!topic || isGenerating}
+            className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-5 h-5" />
+                Generate Flashcards
+              </>
+            )}
+          </button>
+        </div>
       </motion.div>
     </motion.div>
   )
