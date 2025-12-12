@@ -1,22 +1,23 @@
 # JAMB CBT Practice App
 
 ## Overview
-A modern Computer-Based Test (CBT) practice application for JAMB UTME preparation. Built with React + Vite, featuring AI-powered learning assistance via Google Gemini 2.5 Flash.
+A modern Computer-Based Test (CBT) practice application for JAMB UTME preparation. Built with React + Vite, featuring multi-AI powered learning assistance with support for Google Gemini, Poe AI, Grok, and Cerebras.
 
 ## Current State
-Version 2.0.0 - AI-powered release with the following major features:
-- Gemini 2.5 Flash AI integration with image understanding
+Version 2.1.0 - Multi-AI powered release with the following major features:
+- Multiple AI provider support (Gemini, Poe, Grok, Cerebras)
 - Persistent conversation memory for AI assistant
 - Offline question storage via IndexedDB
 - AI-generated flashcards based on JAMB syllabus
 - Dynamic novel analysis generation for Literature
+- Advanced model selection UI
 
 ## Tech Stack
-- Frontend: React 18 with Vite
+- Frontend: React 19 with Vite 7
 - State Management: Zustand
-- Styling: Tailwind CSS
+- Styling: Tailwind CSS 4
 - Animations: Framer Motion
-- AI: Google Gemini 2.5 Flash API
+- AI: Multiple providers (Gemini, Poe, Grok, Cerebras)
 - Offline Storage: IndexedDB
 - Questions API: ALOC API
 
@@ -24,69 +25,68 @@ Version 2.0.0 - AI-powered release with the following major features:
 ```
 cbt-app/
 ├── src/
-│   ├── components/          # Reusable UI components
-│   │   ├── AIAssistant.jsx  # AI chat interface with image upload
+│   ├── components/
+│   │   ├── AIAssistant.jsx  # Multi-AI chat interface with model selection
 │   │   ├── Flashcards.jsx   # AI-generated flashcard system
 │   │   ├── Dictionary.jsx   # Word lookup component
 │   │   └── ...
-│   ├── pages/               # Route pages
+│   ├── pages/
 │   │   ├── Dashboard.jsx    # Main dashboard
 │   │   ├── NovelPage.jsx    # Literature study with AI generation
-│   │   ├── Settings.jsx     # App settings
+│   │   ├── Settings.jsx     # App and AI model settings
 │   │   └── ...
-│   ├── services/            # API and service layers
-│   │   ├── aiService.js     # Gemini AI integration
+│   ├── services/
+│   │   ├── aiService.js     # Multi-provider AI integration
 │   │   ├── api.js           # ALOC API for questions
-│   │   └── offlineStorage.js # IndexedDB operations
+│   │   └── offlineStorage.js
 │   ├── data/
-│   │   └── jambSyllabus.js  # JAMB syllabus topics for all subjects
+│   │   └── jambSyllabus.js  # JAMB syllabus topics
 │   └── store/
 │       └── useStore.js      # Zustand state management
-└── vite.config.js           # Vite configuration
+└── vite.config.js
 ```
 
 ## Key Features
 
 ### AI Assistant (Ilom)
-- Powered by Gemini 2.5 Flash with vision capabilities
-- Supports image upload for diagram/graph analysis
-- Maintains conversation history across sessions
-- Provides detailed explanations with structured breakdowns
+- Multiple AI providers: Gemini, Poe AI, Grok, Cerebras
+- Gemini models: 2.5 Flash, 2.5 Pro, 2.0 Flash, 1.5 Flash, 1.5 Pro
+- Poe models: Claude 3 Haiku, Claude 3 Sonnet, GPT-4o Mini
+- Grok models: Grok Beta, Grok 2
+- Cerebras models: Llama 3.3 70B, Llama 3.1 8B
+- Image upload for diagram analysis (Gemini only)
+- Persistent conversation history
 - Subject-specific study tips
 
 ### Offline Support
-- Questions cached to IndexedDB (not browser cache)
-- Works offline with previously cached questions
+- Questions cached to IndexedDB
+- Works offline with cached questions
 - Flashcards stored locally
 - Novel analyses saved for offline access
 
-### Flashcard System
-- AI-generated flashcards based on JAMB syllabus topics
-- Covers all 15 JAMB subjects
-- Study mode with progress tracking
-- Manual card creation supported
-
-### Novel Analysis
-- Dynamic generation via AI for any JAMB Literature text
-- Generates: plot summary, chapters, characters, themes, literary devices
-- Creates practice questions with explanations
-- Replaces hardcoded content with flexible AI generation
+### Study Features
+- Study Mode: Self-paced learning
+- Practice Mode: Timed single-subject practice
+- Full Exam Mode: Complete JAMB simulation
+- Flashcards: AI-generated study cards
+- Analytics: Performance tracking
 
 ## Environment Variables
-- `GEMINI_API_KEY` - Google Gemini API key (stored as secret)
+- `GEMINI_API_KEY` - Google Gemini API key (required)
+- `VITE_POE_API_KEY` - Poe API key (optional)
+- `VITE_GROK_API_KEY` - Grok API key (optional)
+- `VITE_CEREBRAS_API_KEY` - Cerebras API key (optional)
 
-## JAMB Subjects Covered
+## JAMB Subjects
 English, Mathematics, Physics, Chemistry, Biology, Literature, Government, Commerce, Accounting, Economics, CRK, IRK, Geography, Agricultural Science, History
 
 ## Recent Changes (December 2025)
-- Upgraded from Poe API to Gemini 2.5 Flash
-- Added image analysis capability to AI assistant
-- Implemented persistent AI conversation memory
-- Created comprehensive JAMB syllabus data for flashcard generation
-- Replaced hardcoded "Lekki Headmaster" with dynamic novel generation
-- Removed all "Powered by ALOC" branding
-- Enhanced offline storage with proper IndexedDB implementation
-- Removed all code comments for cleaner production code
+- Added multi-AI provider support
+- Fixed Gemini model names (using 2.0-flash as default)
+- Added advanced model selection UI in AI Assistant and Settings
+- Cleaned up unnecessary Laravel/PHP directories
+- Updated to React 19 and Vite 7
+- Created professional README with screenshots
 
 ## Development
 Run `npm run dev` in the cbt-app directory to start the development server on port 5000.
@@ -94,4 +94,5 @@ Run `npm run dev` in the cbt-app directory to start the development server on po
 ## User Preferences
 - Dark theme by default
 - No code comments in production code
-- Clean, professional UI without external branding
+- Clean, professional UI
+- Multi-AI support for flexibility

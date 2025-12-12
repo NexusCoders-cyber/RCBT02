@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   X, Send, Bot, Loader2, Sparkles, 
-  BookOpen, Lightbulb, Image, Trash2, History
+  BookOpen, Lightbulb, Image, Trash2, Settings, ChevronDown, Check, Zap
 } from 'lucide-react'
 import { 
   askAI, 
@@ -11,7 +11,10 @@ import {
   clarifyTopic,
   analyzeImage,
   loadConversationHistory,
-  clearConversationHistory
+  clearConversationHistory,
+  AI_PROVIDERS,
+  getAISettings,
+  saveAISettings
 } from '../services/aiService'
 import useStore from '../store/useStore'
 
@@ -22,9 +25,20 @@ export default function AIAssistant({ isOpen, onClose, currentQuestion = null, c
   const [isLoading, setIsLoading] = useState(false)
   const [selectedImage, setSelectedImage] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
-  const [showHistory, setShowHistory] = useState(false)
+  const [showModelSelector, setShowModelSelector] = useState(false)
+  const [currentProvider, setCurrentProvider] = useState('gemini')
+  const [currentModel, setCurrentModel] = useState('gemini-2.0-flash')
   const messagesEndRef = useRef(null)
   const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      const settings = await getAISettings()
+      setCurrentProvider(settings.provider)
+      setCurrentModel(settings.model)
+    }
+    loadSettings()
+  }, [])
 
   useEffect(() => {
     const initializeChat = async () => {
@@ -33,9 +47,10 @@ export default function AIAssistant({ isOpen, onClose, currentQuestion = null, c
         if (savedHistory.length > 0) {
           setMessages(savedHistory)
         } else {
+          const providerName = AI_PROVIDERS[currentProvider]?.name || 'AI'
           setMessages([{
             role: 'assistant',
-            content: `Hello! I'm Ilom, your JAMB study assistant powered by advanced AI. I can help you with:
+            content: `Hello! I'm Ilom, your JAMB study assistant powered by ${providerName}. I can help you with:
 
 • Explaining difficult concepts in any subject
 • Breaking down JAMB questions step by step
@@ -49,13 +64,20 @@ I remember our previous conversations to better assist you. How can I help you p
       }
     }
     initializeChat()
-  }, [isOpen, messages.length])
+  }, [isOpen, messages.length, currentProvider])
 
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [messages])
+
+  const handleProviderChange = async (providerId, modelId) => {
+    setCurrentProvider(providerId)
+    setCurrentModel(modelId)
+    await saveAISettings(providerId, modelId)
+    setShowModelSelector(false)
+  }
 
   const handleImageSelect = (e) => {
     const file = e.target.files?.[0]
@@ -185,7 +207,23 @@ I remember our previous conversations to better assist you. How can I help you p
     }])
   }
 
+  const getProviderInfo = () => {
+    const provider = AI_PROVIDERS[currentProvider]
+    if (!provider) return { name: 'AI', icon: '🤖', model: '' }
+    const model = provider.models.find(m => m.id === currentModel)
+    return { 
+      name: provider.name, 
+      icon: provider.icon, 
+      model: model?.name || currentModel,
+      color: provider.color 
+    }
+  }
+
+  const availableProviders = Object.values(AI_PROVIDERS).filter(p => p.available)
+
   if (!isOpen) return null
+
+  const providerInfo = getProviderInfo()
 
   return (
     <AnimatePresence>
@@ -214,9 +252,14 @@ I remember our previous conversations to better assist you. How can I help you p
                   Ilom
                   <span className="text-xs bg-emerald-600/30 text-emerald-400 px-2 py-0.5 rounded-full">AI</span>
                 </h3>
-                <p className="text-xs text-slate-400">
-                  {isOnline ? 'Online • Remembers conversations' : 'Offline - Limited features'}
-                </p>
+                <button
+                  onClick={() => setShowModelSelector(!showModelSelector)}
+                  className="text-xs text-slate-400 hover:text-slate-300 flex items-center gap-1 transition-colors"
+                >
+                  <span>{providerInfo.icon}</span>
+                  <span>{providerInfo.model}</span>
+                  <ChevronDown className="w-3 h-3" />
+                </button>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -235,6 +278,74 @@ I remember our previous conversations to better assist you. How can I help you p
               </button>
             </div>
           </div>
+
+          <AnimatePresence>
+            {showModelSelector && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="border-b border-slate-700 overflow-hidden"
+              >
+                <div className="p-4 bg-slate-900/80 max-h-64 overflow-y-auto">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Settings className="w-4 h-4 text-slate-400" />
+                    <span className="text-sm font-medium text-slate-300">Select AI Model</span>
+                  </div>
+                  <div className="space-y-3">
+                    {availableProviders.map((provider) => (
+                      <div key={provider.id} className="space-y-2">
+                        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r ${provider.color} bg-opacity-20`}>
+                          <span className="text-lg">{provider.icon}</span>
+                          <span className="text-sm font-semibold text-white">{provider.name}</span>
+                        </div>
+                        <div className="grid gap-1.5 pl-2">
+                          {provider.models.map((model) => (
+                            <button
+                              key={model.id}
+                              onClick={() => handleProviderChange(provider.id, model.id)}
+                              className={`flex items-center justify-between p-2.5 rounded-lg transition-all ${
+                                currentProvider === provider.id && currentModel === model.id
+                                  ? 'bg-emerald-600/20 border border-emerald-500/50'
+                                  : 'bg-slate-700/50 hover:bg-slate-700 border border-transparent'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="flex flex-col items-start">
+                                  <span className="text-sm font-medium text-white">{model.name}</span>
+                                  <span className="text-xs text-slate-400">{model.description}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {model.tier === 'premium' && (
+                                  <span className="px-2 py-0.5 text-xs rounded-full bg-amber-500/20 text-amber-400 flex items-center gap-1">
+                                    <Zap className="w-3 h-3" /> Premium
+                                  </span>
+                                )}
+                                {model.tier === 'pro' && (
+                                  <span className="px-2 py-0.5 text-xs rounded-full bg-purple-500/20 text-purple-400">
+                                    Pro
+                                  </span>
+                                )}
+                                {currentProvider === provider.id && currentModel === model.id && (
+                                  <Check className="w-4 h-4 text-emerald-400" />
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {availableProviders.length === 0 && (
+                      <div className="text-center py-4 text-slate-400 text-sm">
+                        No AI providers configured. Add API keys in settings.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {currentQuestion && (
             <div className="p-3 border-b border-slate-700 bg-slate-900/50">
@@ -368,9 +479,9 @@ I remember our previous conversations to better assist you. How can I help you p
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                disabled={!isOnline}
+                disabled={!isOnline || currentProvider !== 'gemini'}
                 className="p-3 rounded-xl bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors disabled:opacity-50"
-                title="Upload image"
+                title={currentProvider !== 'gemini' ? 'Image analysis only available with Gemini' : 'Upload image'}
               >
                 <Image className="w-5 h-5" />
               </button>

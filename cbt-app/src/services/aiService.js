@@ -1,16 +1,77 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
+const POE_API_KEY = import.meta.env.VITE_POE_API_KEY || ''
+const GROK_API_KEY = import.meta.env.VITE_GROK_API_KEY || ''
+const CEREBRAS_API_KEY = import.meta.env.VITE_CEREBRAS_API_KEY || ''
 
 const DB_NAME = 'jamb-cbt-offline'
-const DB_VERSION = 4
+const DB_VERSION = 5
 const AI_CACHE_STORE = 'ai_cache'
 const AI_HISTORY_STORE = 'ai_history'
+const AI_SETTINGS_STORE = 'ai_settings'
 
 let db = null
 let genAI = null
 let chatSession = null
 let conversationHistory = []
+let currentProvider = 'gemini'
+let currentModel = 'gemini-2.0-flash'
+
+export const AI_PROVIDERS = {
+  gemini: {
+    id: 'gemini',
+    name: 'Google Gemini',
+    icon: '✨',
+    color: 'from-blue-500 to-purple-600',
+    description: 'Google\'s most capable AI model',
+    models: [
+      { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Latest & fastest', tier: 'premium' },
+      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Fast & efficient', tier: 'standard' },
+      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', description: 'Advanced reasoning', tier: 'pro' },
+      { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro', description: 'Stable & reliable', tier: 'standard' },
+    ],
+    available: !!GEMINI_API_KEY
+  },
+  poe: {
+    id: 'poe',
+    name: 'Poe AI',
+    icon: '🤖',
+    color: 'from-green-500 to-teal-600',
+    description: 'Access multiple AI models via Poe',
+    models: [
+      { id: 'claude-3-haiku', name: 'Claude 3 Haiku', description: 'Fast & accurate', tier: 'standard' },
+      { id: 'claude-3-sonnet', name: 'Claude 3 Sonnet', description: 'Balanced', tier: 'pro' },
+      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: 'OpenAI compact', tier: 'standard' },
+      { id: 'gemini-pro', name: 'Gemini Pro', description: 'Google via Poe', tier: 'standard' },
+    ],
+    available: !!POE_API_KEY
+  },
+  grok: {
+    id: 'grok',
+    name: 'Grok AI',
+    icon: '🚀',
+    color: 'from-orange-500 to-red-600',
+    description: 'xAI\'s conversational model',
+    models: [
+      { id: 'grok-beta', name: 'Grok Beta', description: 'Latest Grok model', tier: 'standard' },
+      { id: 'grok-2', name: 'Grok 2', description: 'Enhanced capabilities', tier: 'pro' },
+    ],
+    available: !!GROK_API_KEY
+  },
+  cerebras: {
+    id: 'cerebras',
+    name: 'Cerebras AI',
+    icon: '⚡',
+    color: 'from-yellow-500 to-orange-600',
+    description: 'Ultra-fast inference',
+    models: [
+      { id: 'llama-3.3-70b', name: 'Llama 3.3 70B', description: 'High performance', tier: 'pro' },
+      { id: 'llama-3.1-8b', name: 'Llama 3.1 8B', description: 'Fast & efficient', tier: 'standard' },
+    ],
+    available: !!CEREBRAS_API_KEY
+  }
+}
 
 function getGenAI() {
   if (!genAI && GEMINI_API_KEY) {
@@ -42,6 +103,9 @@ async function openDB() {
       if (!database.objectStoreNames.contains(AI_HISTORY_STORE)) {
         database.createObjectStore(AI_HISTORY_STORE, { keyPath: 'id' })
       }
+      if (!database.objectStoreNames.contains(AI_SETTINGS_STORE)) {
+        database.createObjectStore(AI_SETTINGS_STORE, { keyPath: 'id' })
+      }
       if (!database.objectStoreNames.contains('flashcards')) {
         const store = database.createObjectStore('flashcards', { keyPath: 'id' })
         store.createIndex('subject', 'subject', { unique: false })
@@ -55,6 +119,55 @@ async function openDB() {
       }
     }
   })
+}
+
+export async function getAISettings() {
+  try {
+    const database = await openDB()
+    return new Promise((resolve) => {
+      const transaction = database.transaction(AI_SETTINGS_STORE, 'readonly')
+      const store = transaction.objectStore(AI_SETTINGS_STORE)
+      const request = store.get('current_settings')
+      
+      request.onsuccess = () => {
+        const result = request.result
+        if (result) {
+          currentProvider = result.provider || 'gemini'
+          currentModel = result.model || 'gemini-2.0-flash'
+          resolve(result)
+        } else {
+          resolve({ provider: 'gemini', model: 'gemini-2.0-flash' })
+        }
+      }
+      request.onerror = () => resolve({ provider: 'gemini', model: 'gemini-2.0-flash' })
+    })
+  } catch {
+    return { provider: 'gemini', model: 'gemini-2.0-flash' }
+  }
+}
+
+export async function saveAISettings(provider, model) {
+  try {
+    currentProvider = provider
+    currentModel = model
+    chatSession = null
+    
+    const database = await openDB()
+    return new Promise((resolve) => {
+      const transaction = database.transaction(AI_SETTINGS_STORE, 'readwrite')
+      const store = transaction.objectStore(AI_SETTINGS_STORE)
+      store.put({ 
+        id: 'current_settings', 
+        provider, 
+        model,
+        updatedAt: Date.now() 
+      })
+      transaction.oncomplete = () => resolve(true)
+      transaction.onerror = () => resolve(false)
+    })
+  } catch {
+    return false
+  }
 }
 
 async function getCachedResponse(cacheKey) {
@@ -183,38 +296,185 @@ Guidelines:
 
 Remember: You are here to help students learn and succeed in their JAMB examinations.`
 
-async function initializeChat() {
+async function callGeminiAPI(prompt, imageData = null) {
   const ai = getGenAI()
-  if (!ai) return null
-  
+  if (!ai) {
+    throw new Error('Gemini API is not configured. Please add your API key.')
+  }
+
   const model = ai.getGenerativeModel({ 
-    model: 'gemini-2.5-flash-preview-05-20',
+    model: currentModel,
     systemInstruction: SYSTEM_INSTRUCTION
   })
-  
-  const savedHistory = await loadConversationHistory()
-  conversationHistory = savedHistory
-  
-  const formattedHistory = savedHistory.map(msg => ({
-    role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }]
-  }))
-  
-  chatSession = model.startChat({
-    history: formattedHistory,
-    generationConfig: {
-      temperature: 0.7,
-      topP: 0.95,
-      topK: 40,
-      maxOutputTokens: 2048,
+
+  if (imageData) {
+    const imagePart = {
+      inlineData: {
+        data: imageData.split(',')[1],
+        mimeType: imageData.split(';')[0].split(':')[1]
+      }
     }
-  })
+    const result = await model.generateContent([prompt, imagePart])
+    return result.response.text()
+  }
+
+  if (!chatSession) {
+    const savedHistory = await loadConversationHistory()
+    conversationHistory = savedHistory
+    
+    const formattedHistory = savedHistory.map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }))
+    
+    chatSession = model.startChat({
+      history: formattedHistory,
+      generationConfig: {
+        temperature: 0.7,
+        topP: 0.95,
+        topK: 40,
+        maxOutputTokens: 2048,
+      }
+    })
+  }
+
+  const result = await chatSession.sendMessage(prompt)
+  const response = result.response.text()
   
-  return chatSession
+  conversationHistory.push({ role: 'user', content: prompt })
+  conversationHistory.push({ role: 'assistant', content: response })
+  await saveConversationHistory(conversationHistory)
+  
+  return response
+}
+
+async function callPoeAPI(prompt) {
+  if (!POE_API_KEY) {
+    throw new Error('Poe API is not configured. Please add your API key.')
+  }
+
+  const response = await fetch('https://api.poe.com/bot/' + currentModel, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${POE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      query: [{
+        role: 'system',
+        content: SYSTEM_INSTRUCTION
+      }, {
+        role: 'user', 
+        content: prompt
+      }],
+      temperature: 0.7,
+    })
+  })
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.error || 'Poe API request failed')
+  }
+
+  const data = await response.json()
+  return data.text || data.response || 'No response received'
+}
+
+async function callGrokAPI(prompt) {
+  if (!GROK_API_KEY) {
+    throw new Error('Grok API is not configured. Please add your API key.')
+  }
+
+  const response = await fetch('https://api.x.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${GROK_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: currentModel,
+      messages: [{
+        role: 'system',
+        content: SYSTEM_INSTRUCTION
+      }, {
+        role: 'user',
+        content: prompt
+      }],
+      temperature: 0.7,
+    })
+  })
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.error?.message || 'Grok API request failed')
+  }
+
+  const data = await response.json()
+  return data.choices?.[0]?.message?.content || 'No response received'
+}
+
+async function callCerebrasAPI(prompt) {
+  if (!CEREBRAS_API_KEY) {
+    throw new Error('Cerebras API is not configured. Please add your API key.')
+  }
+
+  const response = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${CEREBRAS_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: currentModel,
+      messages: [{
+        role: 'system',
+        content: SYSTEM_INSTRUCTION
+      }, {
+        role: 'user',
+        content: prompt
+      }],
+      temperature: 0.7,
+      max_tokens: 2048,
+    })
+  })
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(data.error?.message || 'Cerebras API request failed')
+  }
+
+  const data = await response.json()
+  return data.choices?.[0]?.message?.content || 'No response received'
+}
+
+async function callAIProvider(prompt, imageData = null) {
+  await getAISettings()
+  
+  switch (currentProvider) {
+    case 'gemini':
+      return callGeminiAPI(prompt, imageData)
+    case 'poe':
+      if (imageData) {
+        throw new Error('Image analysis is only available with Gemini. Please switch to Gemini for image features.')
+      }
+      return callPoeAPI(prompt)
+    case 'grok':
+      if (imageData) {
+        throw new Error('Image analysis is only available with Gemini. Please switch to Gemini for image features.')
+      }
+      return callGrokAPI(prompt)
+    case 'cerebras':
+      if (imageData) {
+        throw new Error('Image analysis is only available with Gemini. Please switch to Gemini for image features.')
+      }
+      return callCerebrasAPI(prompt)
+    default:
+      return callGeminiAPI(prompt, imageData)
+  }
 }
 
 export async function askAI(question, subject = null, context = null, imageData = null) {
-  const cacheKey = `ai-${question.substring(0, 50)}-${subject || 'general'}`
+  const cacheKey = `ai-${question.substring(0, 50)}-${subject || 'general'}-${currentProvider}-${currentModel}`
   
   if (!imageData) {
     const cached = await getCachedResponse(cacheKey)
@@ -227,11 +487,6 @@ export async function askAI(question, subject = null, context = null, imageData 
     throw new Error('You are offline. AI assistance requires an internet connection.')
   }
   
-  const ai = getGenAI()
-  if (!ai) {
-    throw new Error('AI service is not configured. Please check API key.')
-  }
-  
   let userMessage = question
   if (subject) {
     userMessage = `[Subject: ${subject}] ${question}`
@@ -241,44 +496,7 @@ export async function askAI(question, subject = null, context = null, imageData 
   }
   
   try {
-    let response
-    
-    if (imageData) {
-      const model = ai.getGenerativeModel({ 
-        model: 'gemini-2.5-flash-preview-05-20',
-        systemInstruction: SYSTEM_INSTRUCTION
-      })
-      
-      const imagePart = {
-        inlineData: {
-          data: imageData.split(',')[1],
-          mimeType: imageData.split(';')[0].split(':')[1]
-        }
-      }
-      
-      const result = await model.generateContent([userMessage, imagePart])
-      response = result.response.text()
-    } else {
-      if (!chatSession) {
-        await initializeChat()
-      }
-      
-      if (!chatSession) {
-        const model = ai.getGenerativeModel({ 
-          model: 'gemini-2.5-flash-preview-05-20',
-          systemInstruction: SYSTEM_INSTRUCTION
-        })
-        const result = await model.generateContent(userMessage)
-        response = result.response.text()
-      } else {
-        const result = await chatSession.sendMessage(userMessage)
-        response = result.response.text()
-        
-        conversationHistory.push({ role: 'user', content: userMessage })
-        conversationHistory.push({ role: 'assistant', content: response })
-        await saveConversationHistory(conversationHistory)
-      }
-    }
+    const response = await callAIProvider(userMessage, imageData)
     
     if (!imageData) {
       await cacheResponse(cacheKey, response)
@@ -448,6 +666,14 @@ export async function resetChatSession() {
   await clearConversationHistory()
 }
 
+export function getAvailableProviders() {
+  return Object.values(AI_PROVIDERS).filter(p => p.available)
+}
+
+export function getCurrentSettings() {
+  return { provider: currentProvider, model: currentModel }
+}
+
 export default {
   askAI,
   explainQuestion,
@@ -460,5 +686,10 @@ export default {
   resetChatSession,
   loadConversationHistory,
   saveConversationHistory,
-  clearConversationHistory
+  clearConversationHistory,
+  getAISettings,
+  saveAISettings,
+  getAvailableProviders,
+  getCurrentSettings,
+  AI_PROVIDERS
 }
