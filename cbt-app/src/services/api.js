@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_ALOC_API_URL || 'https://questions.aloc.com.ng/api/v2'
-const ACCESS_TOKEN = import.meta.env.VITE_ALOC_ACCESS_TOKEN || 'QB-1e5c5f1553ccd8cd9e11'
+const ACCESS_TOKEN = import.meta.env.VITE_ALOC_ACCESS_TOKEN || 'QB-e1bc44df0c670fa0b972 '
 
 const apiClient = axios.create({
   baseURL: API_URL,
